@@ -136,10 +136,10 @@ MonoBehaviour:
     are also functions to remove and install different shader packages if required."}]'
   lastPath: Assets/Reallusion/CCiC Unity Tools/RLSettingsObject.asset
   toolVersion: 2.2.3
-  shaderToolVersion: 
-  runtimeToolVersion: 
+  shaderToolVersion: 2.2.3
+  runtimeToolVersion: 2.2.3
   showProps: 1
-  lastExportPath: 
+  lastExportPath: C:\Users\Bruger\Documents\GitHub\P8_Project\P8-IMMEXP26\RL_DataLink
   isClientLocal: 1
   lastSuccessfulHost: 
   lastTriedHosts: []

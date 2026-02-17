@@ -1,0 +1,1564 @@
+﻿/* 
+ * Copyright (C) 2021 Victor Soupday
+ * This file is part of CC_Unity_Tools <https://github.com/soupday/CC_Unity_Tools>
+ * 
+ * CC_Unity_Tools is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * CC_Unity_Tools is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with CC_Unity_Tools.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+using System.Collections.Generic;
+using System.IO;
+using UnityEditor;
+using UnityEngine;
+using Object = UnityEngine.Object;
+
+namespace Reallusion.Import
+{
+    public class CharacterInfo
+    {
+        public enum ProcessingType { None, Basic, HighQuality }
+        public enum EyeQuality { None, Basic, Parallax, Refractive }
+        public enum HairQuality { None, Default, TwoPass, Coverage }
+        public enum TexSizeQuality { LowTexureSize, MediumTextureSize, HighTextureSize, MaxTextureSize }
+        public enum TexCompressionQuality { NoCompression, LowTextureQuality, MediumTextureQuality, HighTextureQuality, MaxTextureQuality }
+        public enum SubDLevel { SubD0, SubD1, SubD2 };
+
+        public enum ShaderFeatureFlags
+        {
+            NoFeatures = 0,
+            Tessellation = 1,
+            ClothPhysics = 2, // group flag to allow selection between UnityClothPhysics & MagicaCloth
+            HairPhysics = 4, // group flag to allow selection between UnityClothHairPhysics & MagicaClothHairPhysics
+            SpringBoneHair = 8,  // dynamic bone springbones
+            WrinkleMaps = 16,
+            MagicaCloth = 32, // Magica Mesh Cloth for clothing items
+            MagicaBone = 64, // Magica Bone Cloth for hair
+            UnityClothPhysics = 128, // Unity Cloth for clothing items 
+            UnityClothHairPhysics = 256, // Unity Cloth for hair items
+            MagicaClothHairPhysics = 512, // Magica Mesh Cloth for hair items
+            SpringBonePhysics = 1024,  // group flag to allow selection between SpringBoneHair & MagicaBone
+            Displacement = 2048,
+            TexturePacking = 4096,
+            DualSpecularSkin = 8192,
+            AmplifyShaders = 16384,
+            BoneDriver = 32768,
+            ExpressionTranspose = 65536,
+            ConstraintData = 131072,
+            ExtractGeneric = 262144,
+            WrinkleDisplacement = 524288,
+        }
+
+        public enum ExportType
+        {
+            NONE = 0,
+            AVATAR = 1,
+            PROP = 2,
+            LIGHT = 3,
+            CAMERA = 4,
+            UNKNOWN = 999
+        }
+
+        // Note: Modified refers to 2-pass hair meshes that need animations retargeted to them.
+        public enum AnimationTargetLevel { None, Unmodified, Modified }
+
+        public string linkId = string.Empty;
+        public bool isLinked { get { return linkId != string.Empty; } }
+
+        public string motionPrefix = string.Empty;
+        public ExportType exportType = ExportType.NONE;
+
+        // 'radio groups' of mutually exclusive settings
+        public static ShaderFeatureFlags[] clothGroup =
+        {
+            ShaderFeatureFlags.UnityClothPhysics, // UnityEngine.Cloth instance
+            ShaderFeatureFlags.MagicaCloth // MagicaCloth2 instance set to 'Mesh Cloth' mode
+        };
+
+        public static ShaderFeatureFlags[] hairGroup =
+        {
+            ShaderFeatureFlags.UnityClothHairPhysics, // UnityEngine.Cloth instance for hair objects
+            ShaderFeatureFlags.MagicaClothHairPhysics // Magica Cloth 2 'Mesh Cloth' for hair objects
+        };
+
+        public static ShaderFeatureFlags[] springGroup =
+        {
+            ShaderFeatureFlags.SpringBoneHair, // DynamicBone springbones
+            ShaderFeatureFlags.MagicaBone // MagicaCloth2 instance set to 'Bone Cloth' mode for springbones
+        };
+
+        public enum RigOverride { None = 0, Generic, Humanoid }
+
+        public string guid;
+        public string path;
+        public string infoFilepath;
+        public string jsonFilepath;
+        public string name;
+        public string folder;
+
+        public bool isLOD = false;
+        public bool bakeIsBaked = false;
+        public bool tempHairBake = false;
+        public bool animationSetup = false;
+        // 0 - not set, 1 - targeted to unmodified character, 2 - targeted to modified character (2-pass hair)
+        public AnimationTargetLevel animationRetargeted = AnimationTargetLevel.None;
+
+        public bool selectedInList;
+        public bool settingsChanged;
+
+        // these are the settings the character is currently set to build
+        private ProcessingType logType = ProcessingType.None;
+        private EyeQuality qualEyes = EyeQuality.Parallax;
+        private HairQuality qualHair = HairQuality.TwoPass;
+        private TexSizeQuality qualTexSize = TexSizeQuality.HighTextureSize;
+        private TexCompressionQuality qualTexCompress = TexCompressionQuality.HighTextureQuality;
+        public RigOverride UnknownRigType { get; set; }
+        private bool bakeCustomShaders = true;
+        private bool bakeSeparatePrefab = true;
+        private string version = null;
+
+        public struct GUIDRemap
+        {
+            public string from;
+            public string to;
+
+            public GUIDRemap(string from, string to)
+            {
+                this.from = from;
+                this.to = to;
+            }
+
+            public GUIDRemap(Object from, Object to)
+            {
+                this.from = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(from));
+                this.to = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(to));
+            }
+        }
+
+        private List<GUIDRemap> guidRemaps;
+
+        public void AddGUIDRemap(Object from, Object to)
+        {
+            guidRemaps.Add(new GUIDRemap(from, to));
+        }
+
+        public Object GetGUIDRemapFrom(Object to)
+        {
+            string guidTo = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(to));
+
+            foreach (GUIDRemap gr in guidRemaps)
+            {
+                if (gr.to == guidTo)
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(gr.from);
+                    if (!string.IsNullOrEmpty(path)) return AssetDatabase.LoadAssetAtPath<Object>(path);
+                    else return null;
+                }
+            }
+
+            return null;
+        }
+
+        public Object GetGUIDRemapTo(Object from)
+        {
+            string guidFrom = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(from));
+
+            foreach (GUIDRemap gr in guidRemaps)
+            {
+                if (gr.from == guidFrom)
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(gr.to);
+                    if (!string.IsNullOrEmpty(path)) return AssetDatabase.LoadAssetAtPath<Object>(path);
+                    else return null;
+                }
+            }
+
+            return null;
+        }
+
+        public void RemoveGUIDRemap(Object from, Object to)
+        {
+            string guidTo = "";
+            string guidFrom = "";
+            if (to) guidTo = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(to));
+            if (from) guidFrom = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(from));
+            for (int i = 0; i < guidRemaps.Count; i++)
+            {
+                GUIDRemap gr = guidRemaps[i];
+                if (gr.from == guidFrom || gr.to == guidTo)
+                {
+                    guidRemaps.RemoveAt(i--);
+                }
+            }
+        }
+
+        public void CleanGUIDRemaps()
+        {
+            RemoveGUIDRemap(null, null);
+        }
+
+        public bool AnimationNeedsRetargeting()
+        {
+            ShaderFeatureFlags builtBoneDriverFlags = (BuiltShaderFlags & ShaderFeatureFlags.BoneDriver) |
+                                                      (BuiltShaderFlags & ShaderFeatureFlags.ConstraintData) |
+                                                      (BuiltShaderFlags & ShaderFeatureFlags.ExpressionTranspose) |
+                                                      (BuiltShaderFlags & ShaderFeatureFlags.ExtractGeneric);
+            ShaderFeatureFlags boneDriverFlags = (ShaderFlags & ShaderFeatureFlags.BoneDriver) |
+                                                 (ShaderFlags & ShaderFeatureFlags.ConstraintData) |
+                                                 (ShaderFlags & ShaderFeatureFlags.ExpressionTranspose) |
+                                                 (ShaderFlags & ShaderFeatureFlags.ExtractGeneric);
+            if (builtBoneDriverFlags != boneDriverFlags) return true;
+            AnimationTargetLevel neededTargetLevel = DualMaterialHair ? AnimationTargetLevel.Modified : AnimationTargetLevel.Unmodified;
+            return animationRetargeted != neededTargetLevel;
+        }
+
+        public void UpdateAnimationRetargeting()
+        {
+            AnimationTargetLevel neededTargetLevel = DualMaterialHair ? AnimationTargetLevel.Modified : AnimationTargetLevel.Unmodified;
+            animationRetargeted = neededTargetLevel;
+        }
+
+        public ProcessingType BuildType { get { return logType; } set { logType = value; } }
+        public MaterialQuality BuildQuality
+        {
+            get
+            {
+                if (BuildType == ProcessingType.HighQuality) return MaterialQuality.High;
+                else if (BuildType == ProcessingType.Basic) return MaterialQuality.Default;
+                return MaterialQuality.None;
+            }
+            set
+            {
+                if (value == MaterialQuality.High) BuildType = ProcessingType.HighQuality;
+                else if (value == MaterialQuality.Default) BuildType = ProcessingType.Basic;
+                else BuildType = ProcessingType.None;
+            }
+        }
+
+        public ShaderFeatureFlags ShaderFlags { get; set; } = ShaderFeatureFlags.NoFeatures;
+
+        public bool FeatureUseWrinkleMaps => (ShaderFlags & ShaderFeatureFlags.WrinkleMaps) > 0;
+        public bool FeatureUseTessellation => (ShaderFlags & ShaderFeatureFlags.Tessellation) > 0;
+        public bool FeatureUseClothPhysics => (ShaderFlags & ShaderFeatureFlags.ClothPhysics) > 0;
+        public bool FeatureUseHairPhysics => (ShaderFlags & ShaderFeatureFlags.HairPhysics) > 0;
+        public bool FeatureUseDisplacement => (ShaderFlags & ShaderFeatureFlags.Displacement) > 0;
+        public bool FeatureUseWrinkleDisplacement => ((ShaderFlags & ShaderFeatureFlags.WrinkleMaps) > 0 && 
+                                                      (ShaderFlags & ShaderFeatureFlags.Displacement) > 0 &&
+                                                      (ShaderFlags & ShaderFeatureFlags.WrinkleDisplacement) > 0);
+        public bool FeatureUseTexturePacking => (ShaderFlags & ShaderFeatureFlags.TexturePacking) > 0;
+        public bool FeatureUseDualSpecularSkin => (ShaderFlags & ShaderFeatureFlags.DualSpecularSkin) > 0;
+        public bool FeatureUseAmplifyShaders => (ShaderFlags & ShaderFeatureFlags.AmplifyShaders) > 0;
+        public bool FeatureUseBoneDriver => (ShaderFlags & ShaderFeatureFlags.BoneDriver) > 0;
+        public bool FeatureUseExpressionTranspose => (ShaderFlags & ShaderFeatureFlags.ExpressionTranspose) > 0;
+        public bool FeatureUseConstraintData => (ShaderFlags & ShaderFeatureFlags.ConstraintData) > 0;
+        public bool FeatureUseExtractGeneric => (ShaderFlags & ShaderFeatureFlags.ExtractGeneric) > 0;
+        //public bool FeatureUseSpringBones => (ShaderFlags & ShaderFeatureFlags.SpringBones) > 0;        
+        public bool BasicMaterials => logType == ProcessingType.Basic;
+        public bool HQMaterials => logType == ProcessingType.HighQuality;
+        public EyeQuality QualEyes { get { return qualEyes; } set { qualEyes = value; } }
+        public HairQuality QualHair { get { return qualHair; } set { qualHair = value; } }
+        public bool RefractiveEyes => QualEyes == EyeQuality.Refractive;
+        public bool BasicEyes => QualEyes == EyeQuality.Basic;
+        public bool ParallaxEyes => QualEyes == EyeQuality.Parallax;
+        public bool DualMaterialHair { get { return qualHair == HairQuality.TwoPass; } }
+        public bool CoverageHair { get { return qualHair == HairQuality.Coverage; } }
+        public bool DefaultHair { get { return qualHair == HairQuality.Default; } }
+        public bool BakeCustomShaders { get { return bakeCustomShaders; } set { bakeCustomShaders = value; } }
+        public bool BakeSeparatePrefab { get { return bakeSeparatePrefab; } set { bakeSeparatePrefab = value; } }
+        public TexSizeQuality QualTexSize { get { return qualTexSize; } set { qualTexSize = value; } }
+        public TexCompressionQuality QualTexCompress { get { return qualTexCompress; } set { qualTexCompress = value; } }
+
+        // these are the settings the character has been built to.  
+        private ProcessingType builtLogType = ProcessingType.None;
+        private EyeQuality builtQualEyes = EyeQuality.Parallax;
+        private HairQuality builtQualHair = HairQuality.TwoPass;
+        private bool builtBakeCustomShaders = true;
+        private bool builtBakeSeparatePrefab = true;
+
+        public SubDLevel SubD { get; private set; } = SubDLevel.SubD0;        
+        public ShaderFeatureFlags BuiltShaderFlags { get; private set; } = ShaderFeatureFlags.NoFeatures;
+        public bool BuiltFeatureWrinkleMaps => (BuiltShaderFlags & ShaderFeatureFlags.WrinkleMaps) > 0;
+        public bool BuiltFeatureTessellation => (BuiltShaderFlags & ShaderFeatureFlags.Tessellation) > 0;
+        public bool BuiltBasicMaterials => builtLogType == ProcessingType.Basic;
+        public bool BuiltHQMaterials => builtLogType == ProcessingType.HighQuality;
+        public bool BuiltDualMaterialHair => builtQualHair == HairQuality.TwoPass;
+        public bool BuiltCoverageHair => builtQualHair == HairQuality.Coverage;
+        public bool BuiltDefaultHair => builtQualHair == HairQuality.Default;
+        public EyeQuality BuiltQualEyes => builtQualEyes;
+        public HairQuality BuiltQualHair => builtQualHair;
+        public bool BuiltRefractiveEyes => BuiltQualEyes == EyeQuality.Refractive;
+        public bool BuiltBasicEyes => BuiltQualEyes == EyeQuality.Basic;
+        public bool BuiltParallaxEyes => BuiltQualEyes == EyeQuality.Parallax;
+
+        public MaterialQuality BuiltQuality => BuiltHQMaterials ? MaterialQuality.High : MaterialQuality.Default;
+        public bool Unprocessed => builtLogType == ProcessingType.None;
+
+        public string CharacterName => name;
+
+        public bool CheckSubDLevel()
+        {
+            SubDLevel s = GetSubDLevel();
+            if (SubD != s)
+            {
+                SubD = s;
+                return true;
+            }
+            return false;
+        }
+
+        public enum BoolEnum { NotSet=-1, False=0, True=1 };
+        public BoolEnum isBlenderProject = BoolEnum.NotSet;
+        public bool CheckBlenderProject()
+        {
+            if (isBlenderProject == BoolEnum.NotSet)
+            {
+                isBlenderProject = JsonData.GetBoolValue(CharacterName + "/Blender_Project") ? BoolEnum.True : BoolEnum.False;
+                return true;
+            }
+            return false;
+        }
+        public bool IsBlenderProject
+        {
+            get
+            {                
+                return isBlenderProject == BoolEnum.True;
+            }
+        }
+
+        private BaseGeneration generation = BaseGeneration.None;
+        private GameObject fbx;
+        private QuickJSON jsonData;
+
+        public void FixCharSettings()
+        {
+            if (logType == ProcessingType.HighQuality && !CanHaveHighQualityMaterials)
+                logType = ProcessingType.Basic;
+
+            if (qualEyes == EyeQuality.Refractive && !Pipeline.isHDRP)
+                qualEyes = EyeQuality.Parallax;
+
+            if (qualHair == HairQuality.Coverage && Pipeline.isHDRP)
+                qualHair = HairQuality.Default;
+
+            //if ((ShaderFlags & ShaderFeatureFlags.SpringBoneHair) > 0 &&
+            //    (ShaderFlags & ShaderFeatureFlags.HairPhysics) > 0)
+            //{
+            //    ShaderFlags -= ShaderFeatureFlags.SpringBoneHair;
+            //}
+            CheckRadioGroupFlags();  // set default unity cloth simulation flags if unset
+        }
+
+        public CharacterInfo(string guid)
+        {
+            this.guid = guid;
+            path = AssetDatabase.GUIDToAssetPath(this.guid);
+            name = Path.GetFileNameWithoutExtension(path);
+            folder = Path.GetDirectoryName(path);
+            infoFilepath = Path.Combine(folder, name + "_ImportInfo.txt");
+            jsonFilepath = Path.Combine(folder, name + ".json");
+            if (path.iContains("_lod")) isLOD = true;
+            guidRemaps = new List<GUIDRemap>();
+
+            selectedInList = false;
+            settingsChanged = false;
+
+            if (File.Exists(infoFilepath))
+                Read();
+            else
+                Write();
+        }
+
+        public void CopySettings(CharacterInfo from)
+        {
+            UnknownRigType = from.UnknownRigType;
+            logType = from.logType;
+            qualEyes = from.qualEyes;
+            qualHair = from.qualHair;
+            bakeCustomShaders = from.bakeCustomShaders;
+            bakeSeparatePrefab = from.bakeSeparatePrefab;
+            ShaderFlags = from.ShaderFlags;
+            FixCharSettings();
+        }
+
+        public void ApplySettings()
+        {
+            FixCharSettings();
+            CleanGUIDRemaps();
+
+            builtLogType = logType;
+            builtQualEyes = qualEyes;
+            builtQualHair = qualHair;
+            builtBakeCustomShaders = bakeCustomShaders;
+            builtBakeSeparatePrefab = bakeSeparatePrefab;
+            BuiltShaderFlags = ShaderFlags;
+        }
+
+        public GameObject Fbx
+        {
+            get
+            {
+                if (fbx == null)
+                {
+                    fbx = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                    Util.LogDetail("CharInfo: " + name + " FBX Loaded");
+                }
+                return fbx;
+            }
+        }
+
+        public bool FbxLoaded
+        {
+            get { return fbx != null; }
+        }
+
+        public Avatar GetCharacterAvatar()
+        {
+            Object[] objects = AssetDatabase.LoadAllAssetsAtPath(path);
+            foreach (Object obj in objects)
+            {
+                if (obj.GetType() == typeof(Avatar))
+                {
+                    return obj as Avatar;
+                }
+            }
+
+            return null;
+        }
+
+        public List<string> GetMotionGuids()
+        {
+            List<string> motionGuids = new List<string>();
+            DirectoryInfo di = new DirectoryInfo(folder);
+            string prefix = name + "_";
+            string suffix = "_Motion";
+            foreach (FileInfo fi in di.GetFiles("*.fbx"))
+            {
+                if (fi.Name.iStartsWith(prefix) && fi.Name.iContains(suffix))
+                {
+                    string path = Path.Combine(folder, fi.Name);
+                    string guid = AssetDatabase.AssetPathToGUID(path);
+                    motionGuids.Add(guid);
+                }
+            }
+
+            return motionGuids;
+        }
+
+        public string GetPrefabsFolder()
+        {
+            return Path.Combine(folder, Importer.PREFABS_FOLDER);
+        }
+
+        public GameObject PrefabAsset
+        {
+            get
+            {
+                return Util.FindCharacterPrefabAsset(Fbx);
+            }
+        }
+
+        public GameObject BakedPrefabAsset
+        {
+            get
+            {
+                return Util.FindCharacterPrefabAsset(Fbx, true);
+            }
+        }
+
+        public GameObject GetDraggablePrefab()
+        {
+            // initially try a processed + baked prefab
+            GameObject bakedPrefabAsset = Util.FindCharacterPrefabAsset(Fbx, true);
+            if (bakedPrefabAsset != null) return bakedPrefabAsset;
+
+            // otherwise try a processed prefab
+            GameObject prefabAsset = Util.FindCharacterPrefabAsset(Fbx);
+            if (prefabAsset != null) return prefabAsset;
+
+            // fall back to the (unprocessed) fbx
+            GameObject fbx = Fbx;
+            return fbx;
+        }
+
+        public GameObject GetPrefabInstance(bool baked = false)
+        {
+            if (baked)
+            {
+                GameObject bakedPrefabAsset = BakedPrefabAsset;
+                if (bakedPrefabAsset)
+                    return (GameObject)PrefabUtility.InstantiatePrefab(BakedPrefabAsset);
+            }
+            else
+            {
+                GameObject prefabAsset = PrefabAsset;
+                if (prefabAsset)
+                    return (GameObject)PrefabUtility.InstantiatePrefab(prefabAsset);
+            }
+
+            return null;
+        }
+
+        public QuickJSON JsonData
+        {
+            get
+            {
+                if (jsonData == null)
+                {
+                    jsonData = Util.GetJsonData(jsonFilepath);
+                    Util.LogDetail("CharInfo: " + name + " JsonData Fetched");
+                }
+                return jsonData;
+            }
+        }
+
+        public bool JsonLoaded { get { return jsonData != null; } }
+
+        public QuickJSON RootJsonData
+        {
+            get
+            {
+                string jsonPath = name;
+                if (JsonData.PathExists(jsonPath))
+                    return JsonData.GetObjectAtPath(jsonPath);
+                return null;
+            }
+        }
+
+        public string JsonVersion
+        {
+            get
+            {
+                string jsonPath = name + "/Version";
+                if (JsonData.PathExists(jsonPath))
+                    return JsonData.GetStringValue(jsonPath);
+                return "";
+            }
+        }
+
+        public QuickJSON CharacterJsonData
+        {
+            get
+            {
+                string jsonPath = name + "/Object/" + name;
+                if (JsonData.PathExists(jsonPath))
+                    return JsonData.GetObjectAtPath(jsonPath);
+                return null;
+            }
+        }
+
+        public QuickJSON ObjectsJsonData
+        {
+            get
+            {
+                if (JsonVersion.StartsWith("1.20."))
+                {
+                    string jsonPath = name + "/Object/" + name + "/Nodes";
+                    if (JsonData.PathExists(jsonPath))
+                        return JsonData.GetObjectAtPath(jsonPath);
+                }
+                else
+                {
+                    string jsonPath = name + "/Object/" + name + "/Meshes";
+                    if (JsonData.PathExists(jsonPath))
+                        return JsonData.GetObjectAtPath(jsonPath);
+                }
+                return null;
+            }
+        }
+
+        public string ObjectsMatJsonPath(string objName, string matName)
+        {
+            if (JsonVersion.StartsWith("1.20."))
+            {
+                return objName + "/Meshes/" + objName + "/Materials/" + matName;
+            }
+            else
+            {
+                return objName + "/Materials/" + matName;
+            }
+        }
+
+        public string ObjectsMaterialsJsonPath(string objName)
+        {
+            if (JsonVersion.StartsWith("1.20."))
+            {
+                return objName + "/Meshes/" + objName + "/Materials/";
+            }
+            else
+            {
+                return objName + "/Materials/";
+            }
+        }
+
+        public string ObjectsMeshJsonPath(string objName)
+        {
+            if (JsonVersion.StartsWith("1.20."))
+            {
+                return "Nodes/" + objName + "/Meshes/" + objName;
+            }
+            else
+            {
+                return "Meshes/" + objName;
+            }
+        }
+
+        public QuickJSON GetObjJson(GameObject obj)
+        {
+            QuickJSON objectsData = ObjectsJsonData;
+            string objName = obj.name;
+            List<string> tryObjectNames = new List<string>();
+
+            if (objName.iContains("_Extracted"))
+            {
+                objName = objName.Substring(0, objName.IndexOf("_Extracted", System.StringComparison.InvariantCultureIgnoreCase));
+            }
+
+            tryObjectNames.Add(objName);
+
+            // there is a bug where a space in name causes the name to be truncated on export from CC3/4
+            if (objName.Contains(" "))
+            {
+                Util.LogWarn("Object name " + objName + " contains a space, this can cause the materials to setup incorrectly...");
+                tryObjectNames.Add(objName.Split(' ')[0]);
+            }
+
+            // instalod will generate unique suffixes _0/_1/_2 on character objects where object names and container
+            // transforms have the same name, try to untangle the object name by speculatively removing this suffix.
+            // (seems to happen mostly on accessories)
+            if (objName.Length > 2 && 
+                objName[objName.Length - 2] == '_' && 
+                char.IsDigit(objName[objName.Length - 1]))
+            {
+                Util.LogWarn("Object name " + objName + " may be incorrectly suffixed by InstaLod exporter. Attempting to untangle...");
+                tryObjectNames.Add(objName.Substring(0, objName.Length - 2));
+                // finally search for an object name in the mesh json whose name starts with the truncted source name
+                //realObjName = objectsData.FindKeyName(specObjName);
+            }
+
+            // search for the material json directly from the possible object and material names
+            foreach (string objectName in tryObjectNames)
+            {
+                if (objectsData.PathExists(objectName))
+                {
+                    return objectsData.GetObjectAtPath(objectName);
+                }
+            }
+
+            // finally search for an object and material names in the mesh json whose name starts with the truncted source names
+            foreach (string objectName in tryObjectNames)
+            {
+                string findObjectName = objectName;
+                if (!objectsData.PathExists(findObjectName))
+                    findObjectName = objectsData.FindKeyName(objectName);
+                if (!string.IsNullOrEmpty(findObjectName) && objectsData.PathExists(findObjectName))
+                {
+                    return objectsData.GetObjectAtPath(findObjectName);
+                }
+            }
+
+            return null;
+        }
+
+        public QuickJSON GetMatJson(GameObject obj, string sourceName)
+        {
+            QuickJSON objectsData = ObjectsJsonData;
+            QuickJSON matJson = null;
+            string objName = obj.name;
+            string jsonPath = "";
+            List<string> tryMaterialNames = new List<string>();
+            List<string> tryObjectNames = new List<string>();
+            tryMaterialNames.Add(sourceName);
+
+            if (sourceName.Length > 2 &&
+                sourceName[sourceName.Length - 2] == ' ' && 
+                char.IsDigit(sourceName[sourceName.Length - 1]))
+            {
+                Util.LogWarn("Material name has a Unity duplication suffix, there may be more than one material with this name in the character.");
+                tryMaterialNames.Add(sourceName.Substring(0, sourceName.Length - 2));
+            }
+
+            if (objName.iContains("_Extracted"))
+            {
+                objName = objName.Substring(0, objName.IndexOf("_Extracted", System.StringComparison.InvariantCultureIgnoreCase));
+            }
+
+            tryObjectNames.Add(objName);
+
+            // there is a bug where a space in name causes the name to be truncated on export from CC3/4
+            if (objName.Contains(" "))
+            {
+                Util.LogWarn("Object name " + objName + " contains a space, this can cause the materials to setup incorrectly...");
+                tryObjectNames.Add(objName.Split(' ')[0]);
+            }
+
+            // instalod will generate unique suffixes _0/_1/_2 on character objects where object names and container
+            // transforms have the same name, try to untangle the object name by speculatively removing this suffix.
+            // (seems to happen mostly on accessories)
+            if (objName.Length > 2 &&
+                objName[objName.Length - 2] == '_' && 
+                char.IsDigit(objName[objName.Length - 1]))
+            {
+                Util.LogWarn("Object name " + objName + " may be incorrectly suffixed by InstaLod exporter. Attempting to untangle...");
+                tryObjectNames.Add(objName.Substring(0, objName.Length - 2));
+                // finally search for an object name in the mesh json whose name starts with the truncted source name
+                //realObjName = objectsData.FindKeyName(specObjName);
+            }
+
+            if (sourceName.Length > 2 && 
+                sourceName[sourceName.Length - 2] == '_' && 
+                char.IsDigit(sourceName[sourceName.Length - 1]))
+            {
+                Util.LogWarn("Material name " + sourceName + " may be incorrectly suffixed by InstaLod exporter. Attempting to untangle...");
+                tryMaterialNames.Add(sourceName.Substring(0, sourceName.Length - 2));
+                // finally search for an object name in the mesh json whose name starts with the truncted source name
+                //realMatName = objectsData.FindKeyName(ObjectsMaterialsJsonPath(realObjName), specMatName);
+            }
+
+            // search for the material json directly from the possible object and material names
+            foreach (string objectName in tryObjectNames)
+            {
+                if (objectsData.PathExists(objectName))
+                {
+                    foreach (string materialName in tryMaterialNames)
+                    {
+                        jsonPath = ObjectsMatJsonPath(objectName, materialName);
+                        matJson = objectsData.GetObjectAtPath(jsonPath);
+                        if (matJson != null) return matJson;
+                    }
+                }
+            }
+
+            // finally search for an object and material names in the mesh json whose name starts with the truncted source names
+            foreach (string objectName in tryObjectNames)
+            {
+                string findObjectName = objectName;
+                if (!objectsData.PathExists(findObjectName))
+                    findObjectName = objectsData.FindKeyName(objectName);
+                if (!string.IsNullOrEmpty(findObjectName) && objectsData.PathExists(findObjectName))
+                {
+                    foreach (string materialName in tryMaterialNames)
+                    {
+                        jsonPath = ObjectsMatJsonPath(findObjectName, materialName);
+                        matJson = objectsData.GetObjectAtPath(jsonPath);
+                        if (matJson != null) return matJson;
+                    }
+
+                    foreach (string materialName in tryMaterialNames)
+                    {
+                        string realMaterialName = objectsData.FindKeyName(ObjectsMaterialsJsonPath(findObjectName), materialName);
+                        if (!string.IsNullOrEmpty(realMaterialName))
+                        {
+                            jsonPath = ObjectsMatJsonPath(objectName, realMaterialName);
+                            matJson = objectsData.GetObjectAtPath(jsonPath);
+                            if (matJson != null) return matJson;
+                        }
+                    }
+                }
+            }
+
+            if (matJson == null)
+            {
+                Util.LogError("Unable to find json material data: " + jsonPath);
+            }
+
+            return matJson;
+        }
+
+        public QuickJSON PhysicsJsonData
+        {
+            get
+            {
+                string jsonPath = name + "/Object/" + name + "/Physics";
+                if (JsonData.PathExists(jsonPath))
+                    return JsonData.GetObjectAtPath(jsonPath);
+                return null;
+            }
+        }
+
+        private FacialProfile facialProfile;
+        public FacialProfile FaceProfile
+        {
+            get
+            {
+                if (facialProfile.expressionProfile == ExpressionProfile.None && facialProfile.visemeProfile == VisemeProfile.None)
+                {
+                    facialProfile = FacialProfileMapper.GetMeshFacialProfile(Fbx);
+                }
+                return facialProfile;
+            }
+        }
+
+        public void Refresh()
+        {
+            if (jsonData != null) jsonData = Util.GetJsonData(jsonFilepath);
+        }
+
+        public BaseGeneration Generation
+        {
+            get
+            {
+                if (generation == BaseGeneration.None)
+                {
+                    CheckGeneration();
+                }
+
+                return generation;
+            }
+        }
+
+        public bool HasColorEnabledHair()
+        {
+            if (PrefabAsset)
+            {
+                Renderer[] renderers = PrefabAsset.GetComponentsInChildren<Renderer>();
+                foreach (Renderer r in renderers)
+                {
+                    foreach (Material m in r.sharedMaterials)
+                    {
+                        if (m && m.HasProperty("BOOLEAN_ENABLECOLOR"))
+                        {
+                            if (m.GetFloat("BOOLEAN_ENABLECOLOR") > 0f) return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        public void CheckGeneration()
+        {
+            Util.LogInfo("CheckGeneration: " + name);
+            BaseGeneration oldGen = generation;
+            string gen = "";
+
+            string generationPath = name + "/Object/" + name + "/Generation";
+            if (JsonData.PathExists(generationPath))
+            {
+                gen = JsonData.GetStringValue(generationPath);
+            }
+
+            generation = RL.GetCharacterGeneration(Fbx, gen);
+            CheckOverride();
+            bool setBlender = CheckBlenderProject();
+            bool setSubDB = CheckSubDLevel();
+
+            // new character detected, initialize settings
+            if (oldGen == BaseGeneration.None)
+            {
+                InitSettings();
+                InitPhysics();                
+            }
+
+            bool versionUpgraded = VersionUpgrade();
+
+            if (generation != oldGen || versionUpgraded || setBlender || setSubDB)
+            {
+                Util.LogDetail("CharInfo: " + name + " Generation detected: " + generation.ToString());
+                Write();
+            }
+        }
+
+        public void CheckGenerationQuick()
+        {
+            Debug.Log("CheckGenerationQuick: " + name);
+            BaseGeneration oldGen = generation;
+            string gen = Util.GetJsonGenerationString(jsonFilepath);
+            generation = RL.GetCharacterGeneration(Fbx, gen);
+            CheckOverride();
+            if (generation != oldGen)
+            {
+                Util.LogDetail("CharInfo: " + name + " Generation detected: " + generation.ToString());
+                Write();
+            }
+        }
+
+        public void CheckOverride()
+        {
+            if (UnknownRigType == RigOverride.None)
+            {
+                if (generation == BaseGeneration.Unknown) UnknownRigType = RigOverride.Generic;
+                else UnknownRigType = RigOverride.Humanoid;
+            }
+        }
+
+        public void InitSettings()
+        {
+            //Debug.Log("InitSettings: " + name);
+
+            // if wrinkle map data present, enable wrinkle maps.
+            if (HasWrinkleMaps())
+            {
+                ShaderFlags |= ShaderFeatureFlags.WrinkleMaps;
+            }
+
+            if (HasDisplacement())
+            {
+                ShaderFlags |= ShaderFeatureFlags.Displacement;
+            }
+
+            if (HasExpressionBones())
+            {
+                ShaderFlags |= ShaderFeatureFlags.BoneDriver;
+                ShaderFlags |= ShaderFeatureFlags.ExpressionTranspose;
+            }
+
+            if (HasConstraintData())
+            {
+                ShaderFlags |= ShaderFeatureFlags.ConstraintData;
+            }
+
+            version = Pipeline.VERSION;
+        }
+
+        public bool VersionGTE(int maj, int min, int rev)
+        {
+            if (!string.IsNullOrEmpty(version))
+            {
+                string[] split = version.Split('.');
+                if (split.Length == 3)
+                {
+                    int versionMaj = int.Parse(split[0]);
+                    int versionMin = int.Parse(split[1]);
+                    int versionRev = int.Parse(split[2]);
+                    int versionInt = versionMaj * 10000 + versionMin * 1000 + versionRev;
+                    int cmpInt = maj * 10000 + min * 1000 + rev;
+                    return versionInt >= cmpInt;
+                }
+            }
+            return false;
+        }
+
+        public bool VersionLT(int maj, int min, int rev)
+        {
+            if (!string.IsNullOrEmpty(version))
+            {
+                string[] split = version.Split('.');
+                if (split.Length == 3)
+                {
+                    int versionMaj = int.Parse(split[0]);
+                    int versionMin = int.Parse(split[1]);
+                    int versionRev = int.Parse(split[2]);
+                    int versionInt = versionMaj * 10000 + versionMin * 1000 + versionRev;
+                    int cmpInt = maj * 10000 + min * 1000 + rev;
+                    return versionInt < cmpInt;
+                }
+            }
+            return true;
+        }
+
+        public bool VersionUpgrade()
+        {
+            bool upgraded = false;
+
+            if (VersionLT(2, 1, 1))
+            {
+                if (HasExpressionBones())
+                {
+                    ShaderFlags |= ShaderFeatureFlags.BoneDriver;
+                    ShaderFlags |= ShaderFeatureFlags.ExpressionTranspose;
+                }
+
+                if (HasConstraintData())
+                {
+                    ShaderFlags |= ShaderFeatureFlags.ConstraintData;
+                }
+
+                upgraded = true;
+            }            
+
+            if (upgraded)
+            {
+                version = Pipeline.VERSION;
+            }
+
+            return upgraded;
+        }
+
+        public void InitPhysics()
+        {
+            string jsonPath = name + "/Object/" + name + "/Physics/Soft Physics";
+            bool hasPhysics = JsonData.PathExists(jsonPath);
+
+            if (hasPhysics)
+            {
+                bool isHair = false;
+                bool isCloth = false;
+
+                QuickJSON softPhysicsJson = PhysicsJsonData.GetObjectAtPath("Soft Physics/Meshes");
+                if (softPhysicsJson != null)
+                {
+                    foreach (MultiValue meshJson in softPhysicsJson.values)
+                    {
+                        string meshName = meshJson.Key;
+                        QuickJSON physicsMeshJson = softPhysicsJson.GetObjectAtPath(meshName + "/Materials");
+                        if (physicsMeshJson != null)
+                        {
+                            foreach (MultiValue pmJson in physicsMeshJson.values)
+                            {
+                                string matName = pmJson.Key;
+                                QuickJSON objectMaterialJson = CharacterJsonData.GetObjectAtPath("Meshes/" + meshName + "/Materials/" + matName);
+                                if (objectMaterialJson != null &&
+                                    objectMaterialJson.PathExists("Custom Shader/Shader Name") &&
+                                    objectMaterialJson.GetStringValue("Custom Shader/Shader Name") == "RLHair")
+                                    isHair = true;
+                                else
+                                    isCloth = true;
+                            }
+                        }
+                    }
+                }
+
+                if (isCloth)
+                {
+                    if (!ShaderFlags.HasFlag(ShaderFeatureFlags.ClothPhysics))
+                        ShaderFlags |= ShaderFeatureFlags.ClothPhysics;
+
+                    if (Physics.MagicaCloth2IsAvailable())
+                    {
+                        if (!ShaderFlags.HasFlag(ShaderFeatureFlags.MagicaCloth))
+                            ShaderFlags |= ShaderFeatureFlags.MagicaCloth;
+
+                        if (ShaderFlags.HasFlag(ShaderFeatureFlags.UnityClothPhysics))
+                            ShaderFlags ^= ShaderFeatureFlags.UnityClothPhysics;
+                    }
+                    else
+                    {
+                        if (ShaderFlags.HasFlag(ShaderFeatureFlags.MagicaCloth))
+                            ShaderFlags ^= ShaderFeatureFlags.MagicaCloth;
+
+                        if (!ShaderFlags.HasFlag(ShaderFeatureFlags.UnityClothPhysics))
+                            ShaderFlags |= ShaderFeatureFlags.UnityClothPhysics;
+                    }
+                }
+
+                if (isHair)
+                {
+                    if (!ShaderFlags.HasFlag(ShaderFeatureFlags.HairPhysics))
+                        ShaderFlags |= ShaderFeatureFlags.HairPhysics;
+
+                    if (Physics.MagicaCloth2IsAvailable())
+                    {
+                        if (!ShaderFlags.HasFlag(ShaderFeatureFlags.MagicaClothHairPhysics))
+                            ShaderFlags |= ShaderFeatureFlags.MagicaClothHairPhysics;
+
+                        if (ShaderFlags.HasFlag(ShaderFeatureFlags.UnityClothHairPhysics))
+                            ShaderFlags ^= ShaderFeatureFlags.UnityClothHairPhysics;
+                    }
+                    else
+                    {
+                        if (ShaderFlags.HasFlag(ShaderFeatureFlags.MagicaClothHairPhysics))
+                            ShaderFlags ^= ShaderFeatureFlags.MagicaClothHairPhysics;
+
+                        if (!ShaderFlags.HasFlag(ShaderFeatureFlags.UnityClothHairPhysics))
+                            ShaderFlags |= ShaderFeatureFlags.UnityClothHairPhysics;
+                    }
+                }
+            }
+        }
+
+        public bool HasWrinkleMaps()
+        {
+            return AnyJsonMaterialPathExists("Wrinkle/Textures");
+        }
+
+        public bool HasDisplacement()
+        {
+            return AnyJsonMaterialPathExists("Textures/Displacement/Texture Path", true);
+        }
+
+        public bool IsRLCharacter()
+        {
+            if (Generation == BaseGeneration.ActorBuild ||
+                Generation == BaseGeneration.ActorCore ||
+                Generation == BaseGeneration.G3 ||
+                Generation == BaseGeneration.G3Plus ||
+                Generation == BaseGeneration.GameBase)
+                return true;
+            return false;
+        }
+
+        public bool HasExpressionBones()
+        {            
+            if (IsRLCharacter())
+            {
+                string jsonPath = name + "/Object/" + name + "/Expression";
+                return JsonData.PathExists(jsonPath);
+            }
+            return false;
+        }
+
+        public bool HasConstraintData()
+        {
+            if (IsRLCharacter())
+            {
+                string jsonPath = name + "/Object/" + name + "/Constraint";
+                QuickJSON data = JsonData.GetObjectAtPath(jsonPath);
+                bool hasData = data != null && data.values.Count > 0;
+                return hasData;
+            }
+            return false;
+        }
+
+        public bool HasWrinkleDisplacement()
+        {
+            return AnyJsonMaterialPathExists("Resource Textures/Wrinkle Dis 1/Texture Path", true);
+        }
+
+        public bool AnyJsonMaterialPathExists(string path, bool requireValue = false)
+        {
+            QuickJSON objectsJson = ObjectsJsonData;
+
+            foreach (MultiValue mvMesh in objectsJson.values)
+            {
+                if (mvMesh.Type == MultiType.Object)
+                {
+                    QuickJSON objJson = mvMesh.ObjectValue;
+                    string objName = mvMesh.Key;
+                    string materialsPath = ObjectsMaterialsJsonPath(objName);
+                    QuickJSON materialsJson = objectsJson.GetObjectAtPath(materialsPath);
+                    if (materialsJson != null)
+                    {
+                        foreach (MultiValue mvMat in materialsJson.values)
+                        {
+                            if (mvMat.Type == MultiType.Object)
+                            {
+                                QuickJSON matjson = mvMat.ObjectValue;
+                                if (matjson.PathExists(path))
+                                {
+                                    if (requireValue)
+                                    {
+                                        return matjson.GetMultiValue(path).HasValue();
+                                    }
+                                    else
+                                    {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        // If there is any material of node type: Eyelash, then the standard eyelash should be disabled
+        public bool HasExternalEyelash()
+        {
+            return AnyJsonMaterialNodeTypeEquals("Eyelash");
+        }
+
+        public bool AnyJsonMaterialNodeTypeEquals(string searchNodeType)
+        {
+            QuickJSON objectsJson = ObjectsJsonData;
+            const string path = "Node Type";
+
+            foreach (MultiValue mvMesh in objectsJson.values)
+            {
+                if (mvMesh.Type == MultiType.Object)
+                {
+                    QuickJSON objJson = mvMesh.ObjectValue;
+                    string objName = mvMesh.Key;
+                    string materialsPath = ObjectsMaterialsJsonPath(objName);
+                    QuickJSON materialsJson = objectsJson.GetObjectAtPath(materialsPath);
+                    if (materialsJson != null)
+                    {
+                        foreach (MultiValue mvMat in materialsJson.values)
+                        {
+                            if (mvMat.Type == MultiType.Object)
+                            {
+                                QuickJSON matjson = mvMat.ObjectValue;
+                                if (matjson.PathExists(path))
+                                {
+                                    string matNodeType = matjson.GetStringValue(path);
+                                    if (matNodeType == searchNodeType) return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        public SubDLevel GetSubDLevel()
+        {
+            QuickJSON objectsJson = ObjectsJsonData;
+            const string path = "SubD Level";
+            int maxLevel = 0;
+
+            foreach (MultiValue mvMesh in objectsJson.values)
+            {
+                if (mvMesh.Type == MultiType.Object)
+                {
+                    QuickJSON objJson = mvMesh.ObjectValue;
+                    if (objJson.PathExists(path))
+                    {
+                        int level = objJson.GetIntValue(path);
+                        if (level > maxLevel) maxLevel = level;
+                    }
+                }
+            }
+            maxLevel = Mathf.Max(0, Mathf.Min(maxLevel, 2));
+            return (SubDLevel)maxLevel;
+        }
+
+        public void Release()
+        {
+            if (jsonData != null || fbx != null)
+            {
+                jsonData = null;
+                fbx = null;
+                Util.LogDetail("CharInfo: " + name + " Data Released!");
+            }
+        }
+
+        public bool CanHaveHighQualityMaterials
+        {
+            get
+            {
+                switch (Generation)
+                {
+                    case BaseGeneration.G1:
+                    case BaseGeneration.G3:
+                    case BaseGeneration.G3Plus:
+                    case BaseGeneration.GameBase:
+                    case BaseGeneration.ActorBuild:
+                    case BaseGeneration.Unknown:
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        }
+
+        public void Read()
+        {
+            TextAsset infoAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(infoFilepath);
+            guidRemaps.Clear();
+            string[] lineEndings = new string[] { "\r\n", "\r", "\n" };
+            char[] propertySplit = new char[] { '=' };
+            char[] guidSplit = new char[] { '|' };
+            string[] lines = infoAsset.text.Split(lineEndings, System.StringSplitOptions.None);
+            string property = "";
+            string value = "";
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string[] line = lines[i].Split(propertySplit, System.StringSplitOptions.None);
+                if (line.Length > 0)
+                    property = line[0];
+                if (line.Length > 1)
+                    value = line[1];
+
+                switch (property)
+                {
+                    case "version":
+                        version = value;
+                        break;
+                    case "logType":
+                        if (value == "Basic") logType = ProcessingType.Basic;
+                        else if (value == "HighQuality") logType = ProcessingType.HighQuality;
+                        else logType = ProcessingType.None;
+                        break;
+                    case "qualEyes":
+                        if (value == "Basic") qualEyes = EyeQuality.Basic;
+                        else if (value == "Parallax") qualEyes = EyeQuality.Parallax;
+                        else if (value == "Refractive") qualEyes = EyeQuality.Refractive;
+                        else qualEyes = EyeQuality.None;
+                        break;
+                    case "qualHair":
+                        if (value == "Default") qualHair = HairQuality.Default;
+                        else if (value == "TwoPass") qualHair = HairQuality.TwoPass;
+                        else if (value == "Coverage") qualHair = HairQuality.Coverage;
+                        else qualHair = HairQuality.None;
+                        break;
+                    case "dualMaterialHair":
+                        if (qualHair == HairQuality.None)
+                            qualHair = value == "true" ? HairQuality.TwoPass : HairQuality.Default;
+                        break;
+                    case "bakeIsBaked":
+                        bakeIsBaked = value == "true";
+                        break;
+                    case "tempHairBake":
+                        tempHairBake = value == "true";
+                        break;
+                    case "bakeCustomShaders":
+                        bakeCustomShaders = value == "true";
+                        break;
+                    case "bakeSeparatePrefab":
+                        bakeSeparatePrefab = value == "true";
+                        break;
+                    case "generation":
+                        generation = (BaseGeneration)System.Enum.Parse(typeof(BaseGeneration), value);
+                        break;
+                    case "subDLevel":
+                        SubD = (SubDLevel)System.Enum.Parse(typeof(SubDLevel), value);
+                        break;
+                    case "isBlender":                        
+                        isBlenderProject = (BoolEnum)System.Enum.Parse(typeof(BoolEnum), value);
+                        break;
+                    case "isLOD":
+                        isLOD = value == "true";
+                        break;
+                    case "shaderFlags":
+                        ShaderFlags = (ShaderFeatureFlags)int.Parse(value);
+                        break;
+                    case "animationSetup":
+                        animationSetup = value == "true";
+                        break;
+                    case "animationRetargeted":
+                        animationRetargeted = (AnimationTargetLevel)int.Parse(value);
+                        break;
+                    case "rigOverride":
+                        UnknownRigType = (RigOverride)System.Enum.Parse(typeof(RigOverride), value);
+                        break;
+                    case "GUIDRemap":
+                        string[] guids = value.Split(guidSplit, System.StringSplitOptions.None);
+                        if (guids.Length == 2)
+                        {
+                            guidRemaps.Add(new GUIDRemap(guids[0], guids[1]));
+                        }
+                        break;
+                    case "linkId":
+                        {
+                            linkId = value;
+                            break;
+                        }
+                    case "motionPrefix":
+                        {
+                            motionPrefix = value;
+                            break;
+                        }
+                    case "exportType":
+                        {
+                            exportType = (ExportType)System.Enum.Parse(typeof(ExportType), value);
+                            break;
+                        }
+                    case "qualTexSize":
+                        {
+                            qualTexSize = (TexSizeQuality)System.Enum.Parse(typeof(TexSizeQuality), value);
+                            break;
+                        }
+                    case "qualTexCompress":
+                        {
+                            qualTexCompress = (TexCompressionQuality)System.Enum.Parse(typeof(TexCompressionQuality), value);
+                            break;
+                        }
+                }
+            }
+            ApplySettings();
+        }
+
+        public void Write()
+        {
+            ApplySettings();
+            StreamWriter writer = new StreamWriter(infoFilepath, false);
+            writer.WriteLine("version=" + version);
+            writer.WriteLine("logType=" + builtLogType.ToString());
+            writer.WriteLine("generation=" + generation.ToString());
+            writer.WriteLine("subDLevel=" + SubD.ToString());
+            writer.WriteLine("isBlender=" + isBlenderProject.ToString());
+            writer.WriteLine("isLOD=" + (isLOD ? "true" : "false"));           
+            writer.WriteLine("qualEyes=" + builtQualEyes.ToString());
+            writer.WriteLine("qualHair=" + builtQualHair.ToString());
+            writer.WriteLine("bakeIsBaked=" + (bakeIsBaked ? "true" : "false"));
+            writer.WriteLine("tempHairBake=" + (tempHairBake ? "true" : "false"));
+            writer.WriteLine("bakeCustomShaders=" + (builtBakeCustomShaders ? "true" : "false"));
+            writer.WriteLine("bakeSeparatePrefab=" + (builtBakeSeparatePrefab ? "true" : "false"));
+            writer.WriteLine("shaderFlags=" + (int)BuiltShaderFlags);
+            writer.WriteLine("animationSetup=" + (animationSetup ? "true" : "false"));
+            writer.WriteLine("animationRetargeted=" + ((int)animationRetargeted).ToString());
+            writer.WriteLine("rigOverride=" + UnknownRigType.ToString());
+            writer.WriteLine("linkId=" + linkId);
+            writer.WriteLine("motionPrefix=" + motionPrefix);
+            writer.WriteLine("exportType=" + exportType.ToString());
+            writer.WriteLine("qualTexSize=" + qualTexSize.ToString());
+            writer.WriteLine("qualTexCompress=" + qualTexCompress.ToString());
+            foreach (GUIDRemap gr in guidRemaps)
+            {
+                writer.WriteLine("GUIDRemap=" + gr.from + "|" + gr.to);
+            }
+            writer.Close();
+            AssetDatabase.ImportAsset(infoFilepath);
+        }
+
+        public void CheckRadioGroupFlags()
+        {
+            if (ImporterWindow.Current == null)
+            {
+                Util.LogWarn("The Importer Window is not open - please open the CC/iC importer window before continuing.");
+                return;
+            }
+
+            if (ShaderFlags.HasFlag(ShaderFeatureFlags.ClothPhysics))
+            {
+                if (!ImporterWindow.Current.MagicaCloth2Available)
+                {
+                    ShaderFlags |= ShaderFeatureFlags.UnityClothPhysics;
+                }
+
+                if (!GroupHasFlagSet(clothGroup))
+                {
+                    ShaderFlags |= ShaderFeatureFlags.UnityClothPhysics;
+                }
+            }
+            else
+            {
+                if (GroupHasFlagSet(clothGroup))
+                {
+                    ShaderFlags |= ShaderFeatureFlags.ClothPhysics;
+                }
+            }
+
+            if (ShaderFlags.HasFlag(ShaderFeatureFlags.HairPhysics))
+            {
+                if (!ImporterWindow.Current.MagicaCloth2Available && !ImporterWindow.Current.DynamicBoneAvailable)
+                {
+                    ShaderFlags |= ShaderFeatureFlags.UnityClothHairPhysics;
+                }
+
+                if (!GroupHasFlagSet(hairGroup))
+                {
+                    ShaderFlags |= ShaderFeatureFlags.UnityClothHairPhysics;
+                }
+            }
+            else
+            {
+                if (GroupHasFlagSet(hairGroup))
+                {
+                    ShaderFlags |= ShaderFeatureFlags.HairPhysics;
+                }
+            }
+        }
+
+        public void EnsureDefaultsAreSet(ShaderFeatureFlags flag)
+        {
+            if (ImporterWindow.Current == null)
+            {
+                Util.LogWarn("The Importer Window is not open - please open the CC/iC importer window before continuing.");
+                return;
+            }
+
+            // if no alternatives are available or the flags are unset - then set unity physics as a default when activating cloth or hair physics
+            switch (flag)
+            {
+                case ShaderFeatureFlags.ClothPhysics:
+                    {
+                        if (!ImporterWindow.Current.MagicaCloth2Available)
+                        {
+                            ShaderFlags |= ShaderFeatureFlags.UnityClothPhysics;
+                        }
+
+                        if (!GroupHasFlagSet(clothGroup))
+                        {
+                            ShaderFlags |= ShaderFeatureFlags.UnityClothPhysics;
+                        }
+
+                        break;
+                    }
+                case ShaderFeatureFlags.HairPhysics:
+                    {
+                        if (!ImporterWindow.Current.MagicaCloth2Available && !ImporterWindow.Current.DynamicBoneAvailable)
+                        {
+                            ShaderFlags |= ShaderFeatureFlags.UnityClothHairPhysics;
+                        }
+
+                        if (!GroupHasFlagSet(hairGroup))
+                        {
+                            ShaderFlags |= ShaderFeatureFlags.UnityClothHairPhysics;
+                        }
+
+                        break;
+                    }
+                case ShaderFeatureFlags.SpringBonePhysics:
+                    {
+                        bool dyn = ImporterWindow.Current.DynamicBoneAvailable;
+                        bool mag = ImporterWindow.Current.MagicaCloth2Available;
+
+                        if (dyn && mag)
+                        {
+                            ShaderFlags |= ShaderFeatureFlags.MagicaBone;
+                        }
+                        else
+                        {
+                            if (mag)
+                                ShaderFlags |= ShaderFeatureFlags.MagicaBone;
+                            else if (dyn)
+                                ShaderFlags |= ShaderFeatureFlags.SpringBoneHair;
+                        }
+
+                        break;
+                    }
+            }
+        }
+
+        public bool GroupHasFlagSet(ShaderFeatureFlags[] group)
+        {
+            foreach (ShaderFeatureFlags groupFlag in group)
+            {
+                if (ShaderFlags.HasFlag(groupFlag)) return true;
+            }
+            return false;
+        }
+
+        public bool UsePackedTextures(MaterialType materialType)
+        {
+            return true;
+            /*
+            return FeatureUseTexturePacking ||
+                   (FeatureUseDualSpecularSkin && (materialType == MaterialType.Skin ||
+                                                   materialType == MaterialType.Head));
+            */
+        }
+
+        public bool UseTessellation(MaterialType materialType, QuickJSON matJson)
+        {
+            bool useDisplacement = false;
+            if (matJson.PathExists("Textures/Displacement/Texture Path") &&
+                !string.IsNullOrEmpty(matJson.GetStringValue("Textures/Displacement/Texture Path")))
+            {
+                useDisplacement = FeatureUseDisplacement;
+            }
+
+            // always try to tessellate with displacement maps
+            if (FeatureUseTessellation && useDisplacement) return true;
+
+            // try tessellate skin and teeth if requested
+            if (FeatureUseTessellation &&
+                (materialType == MaterialType.Skin ||
+                 materialType == MaterialType.Head ||
+                 materialType == MaterialType.Cornea ||
+                 materialType == MaterialType.Eye ||
+                 materialType == MaterialType.Teeth)) return true;
+
+            return false;
+        }
+
+        public float GetBoneScale()
+        {
+            Animator animator = fbx.GetComponentInChildren<Animator>();
+            if (animator)
+            {
+                Avatar avatar = animator.avatar;
+                if (avatar.isHuman && avatar.humanDescription.skeleton.Length > 0)
+                {
+                    return avatar.humanDescription.skeleton[0].scale.y;
+                }
+            }
+
+            return 1f;
+        }
+
+    }
+}
