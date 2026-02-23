@@ -109,7 +109,7 @@ Material:
     - _LimbusColor: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &7014202405765466672
+--- !u!114 &1284460718849786322
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}

@@ -1913,7 +1913,7 @@
                                             "Texture Path": "./textures/MedvinNEO/MedvinNEO/CC_Base_Tongue/Std_Tongue/Std_Tongue_MicroN.png"
                                         },
                                         "Gradient AO": {
-                                            "Texture Path": "./textures/MedvinNEO/CC_Base_Teeth/CC_Base_Teeth/Std_Upper_Teeth/Std_Upper_Teeth_GradAO.jpg"
+                                            "Texture Path": "./textures/MedvinNEO/MedvinNEO/CC_Base_Tongue/Std_Tongue/Std_Tongue_GradAO.jpg"
                                         }
                                     },
                                     "Variable": {
@@ -3722,7 +3722,7 @@
                                             "Texture Path": "./textures/MedvinNEO/CC_Base_Teeth/CC_Base_Teeth/Std_Upper_Teeth/Std_Upper_Teeth_MicroN.png"
                                         },
                                         "Gradient AO": {
-                                            "Texture Path": "./textures/MedvinNEO/CC_Base_Teeth/CC_Base_Teeth/Std_Upper_Teeth/Std_Upper_Teeth_GradAO.jpg"
+                                            "Texture Path": "./textures/MedvinNEO/MedvinNEO/CC_Base_Tongue/Std_Tongue/Std_Tongue_GradAO.jpg"
                                         },
                                         "Gums Mask": {
                                             "Texture Path": "./textures/MedvinNEO/CC_Base_Teeth/CC_Base_Teeth/Std_Upper_Teeth/Std_Upper_Teeth_GumsMask.jpg"
@@ -3864,7 +3864,7 @@
                                             "Texture Path": "./textures/MedvinNEO/CC_Base_Teeth/CC_Base_Teeth/Std_Upper_Teeth/Std_Upper_Teeth_MicroN.png"
                                         },
                                         "Gradient AO": {
-                                            "Texture Path": "./textures/MedvinNEO/CC_Base_Teeth/CC_Base_Teeth/Std_Upper_Teeth/Std_Upper_Teeth_GradAO.jpg"
+                                            "Texture Path": "./textures/MedvinNEO/MedvinNEO/CC_Base_Tongue/Std_Tongue/Std_Tongue_GradAO.jpg"
                                         },
                                         "Gums Mask": {
                                             "Texture Path": "./textures/MedvinNEO/CC_Base_Teeth/CC_Base_Teeth/Std_Upper_Teeth/Std_Upper_Teeth_GumsMask.jpg"

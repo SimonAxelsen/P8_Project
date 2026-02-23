@@ -40,7 +40,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _GradientAOMap:
-        m_Texture: {fileID: 2800000, guid: da27818f805fbf14393037eaf4033927, type: 3}
+        m_Texture: {fileID: 2800000, guid: c8992e8a6ddd5ba46872f479c9a5c760, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _GumsMaskMap:
@@ -94,7 +94,7 @@ Material:
     - _EmissiveColor: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &6994077902427419961
+--- !u!114 &7301133949860853389
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}

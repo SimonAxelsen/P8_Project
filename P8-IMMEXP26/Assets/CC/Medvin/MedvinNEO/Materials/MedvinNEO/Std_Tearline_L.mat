@@ -64,7 +64,7 @@ Material:
     - _DetailTiling: {r: 1.5, g: 1.5, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &7802689890211628677
+--- !u!114 &6617623874817771022
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
