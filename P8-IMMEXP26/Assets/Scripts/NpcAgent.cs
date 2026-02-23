@@ -3,15 +3,18 @@ using Piper;
 
 /// <summary>
 /// Attach to each NPC GameObject. Holds its own profile, audio, and talks to the shared LlmService.
+/// Parses [META] non-verbal actions from LLM output and fires animator triggers.
 /// </summary>
 public class NpcAgent : MonoBehaviour
 {
     public NPCProfileAsset profileAsset;
     public PiperManager piperManager;
+    public Animator animator;
 
     [HideInInspector] public NPCProfile Profile => profileAsset != null ? profileAsset.profile : null;
 
     public System.Action<string> OnResponseReceived;
+    public System.Action<NpcAction> OnActionReceived;
 
     private AudioSource audioSource;
     private LlmService llm;
@@ -21,6 +24,7 @@ public class NpcAgent : MonoBehaviour
         llm = FindObjectOfType<LlmService>();
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
+        if (animator == null)    animator = GetComponentInChildren<Animator>();
     }
 
     /// <summary>Send a user message to this agent's LLM personality.</summary>
@@ -30,12 +34,26 @@ public class NpcAgent : MonoBehaviour
         llm.Ask(userText, Profile, OnLlmResponse);
     }
 
-    void OnLlmResponse(string response)
+    void OnLlmResponse(string raw)
     {
-        Debug.Log($"<color=cyan>[{Profile.npcName}]</color> {response}");
-        OnResponseReceived?.Invoke(response);
+        var (action, dialogue) = NpcAction.Parse(raw);
 
-        if (piperManager != null) Speak(response);
+        Debug.Log($"<color=cyan>[{Profile.npcName}]</color> {dialogue}");
+        if (!action.IsEmpty)
+            Debug.Log($"<color=yellow>[{Profile.npcName} action]</color> {action.action} | gaze: {action.gaze}");
+
+        ApplyAction(action);
+        OnActionReceived?.Invoke(action);
+        OnResponseReceived?.Invoke(dialogue);
+
+        if (piperManager != null) Speak(dialogue);
+    }
+
+    void ApplyAction(NpcAction action)
+    {
+        if (animator == null || string.IsNullOrEmpty(action.action)) return;
+        try { animator.SetTrigger(action.action); }
+        catch { Debug.LogWarning($"{name}: Animator has no trigger '{action.action}'"); }
     }
 
     async void Speak(string text)

@@ -1,29 +1,26 @@
 using UnityEngine;
 using System;
 
+/// <summary>
+/// Lightweight NPC identity. System prompt + non-verbal instructions are baked
+/// into the Ollama Modelfile (see server/modelfiles/). This just holds the
+/// model reference and runtime tweaks editable in the Inspector.
+/// </summary>
 [Serializable]
 public class NPCProfile
 {
     public string npcName = "New NPC";
 
-    [TextArea(3, 10)] public string systemPrompt = "You are a helpful AI assistant.";
-    [TextArea(3, 10)] public string contextPrompt;
-    [TextArea(3, 10)] public string personalityTraits;
+    [Header("Ollama Model (created via Modelfile)")]
+    [Tooltip("Name of the Ollama model that already contains the system prompt + META instructions")]
+    public string modelName = "npc-default";
 
-    [Header("Voice")]
-    public string voiceModelName = "en_US-lessac-medium";
-
-    [Header("LLM")]
+    [Header("LLM Overrides")]
     [Range(0f, 2f)] public float temperature = 0.7f;
     [Range(1f, 2f)] public float repeatPenalty = 1.1f;
 
-    public string GetSystemPrompt()
-    {
-        string p = $"You are {npcName}. {systemPrompt}";
-        if (!string.IsNullOrEmpty(personalityTraits)) p += $"\n\nPersonality: {personalityTraits}";
-        if (!string.IsNullOrEmpty(contextPrompt))     p += $"\n\nContext: {contextPrompt}";
-        return p;
-    }
+    [Header("Voice")]
+    public string voiceModelName = "en_US-lessac-medium";
 }
 
 [CreateAssetMenu(fileName = "New NPC Profile", menuName = "AI/NPC Profile")]

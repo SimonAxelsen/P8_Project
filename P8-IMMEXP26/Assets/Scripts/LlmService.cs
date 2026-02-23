@@ -1,106 +1,98 @@
 using UnityEngine;
-using UnityEngine.Networking;
 using System.Text;
-using System.Collections;
+using System.Collections.Generic;
+using NativeWebSocket;
 
 /// <summary>
-/// Shared stateless LLM service. One per scene. Agents call Ask() with their own profile.
+/// Shared LLM service. Connects to the PC relay server via WebSocket.
+/// Each NPC profile has its own Ollama model name (created via Modelfile with baked-in system prompt).
 /// </summary>
 public class LlmService : MonoBehaviour
 {
-    [Header("Ollama")]
-    public string ollamaUrl = "http://localhost:11434/api/generate";
-    public string modelName = "qwen3:4b-instruct-2507-q4_K_M";
+    [Header("Relay Server")]
+    public string serverUrl = "ws://localhost:3000";
 
-    /// <summary>Send a prompt to Ollama using the given NPC profile. Response returned via callback.</summary>
+    private WebSocket ws;
+    private readonly Dictionary<string, System.Action<string>> pending = new();
+
+    async void Start()
+    {
+        ws = new WebSocket(serverUrl);
+        ws.OnOpen    += ()  => Debug.Log("[LlmService] Connected to relay");
+        ws.OnError   += (e) => Debug.LogError($"[LlmService] WS error: {e}");
+        ws.OnClose   += (_) => Debug.Log("[LlmService] WS closed");
+        ws.OnMessage += OnMessage;
+        await ws.Connect();
+    }
+
+    void Update()
+    {
+        #if !UNITY_WEBGL || UNITY_EDITOR
+        ws?.DispatchMessageQueue();
+        #endif
+    }
+
+    async void OnApplicationQuit() => await ws?.Close();
+
+    /// <summary>Send a prompt to the relay server for a specific NPC.</summary>
     public void Ask(string userText, NPCProfile profile, System.Action<string> onResponse)
     {
-        StartCoroutine(PostRequest(userText, profile, onResponse));
-    }
+        if (ws == null || ws.State != WebSocketState.Open)
+        { Debug.LogError("[LlmService] WebSocket not connected"); return; }
 
-    IEnumerator PostRequest(string userPrompt, NPCProfile profile, System.Action<string> onResponse)
-    {
-        string system = profile != null ? profile.GetSystemPrompt() : "";
-        float temp = profile != null ? profile.temperature : 0.7f;
-        float rep  = profile != null ? profile.repeatPenalty : 1.1f;
+        string npcKey = profile.npcName;
+        pending[npcKey] = onResponse;
 
-        // Use a proper JSON structure class instead of manual string formatting
-        // This avoids issues with escaping and missing fields
-        var payload = new OllamaRequest
+        var msg = new RelayRequest
         {
-            model = modelName,
-            prompt = userPrompt,
-            system = system,
-            stream = false,
-            options = new OllamaOptions { temperature = temp, repeat_penalty = rep }
+            type = "llm",
+            npc = npcKey,
+            model = profile.modelName,
+            prompt = userText,
+            options = new LlmOptions { temperature = profile.temperature, repeat_penalty = profile.repeatPenalty }
         };
 
-        string json = JsonUtility.ToJson(payload);
-
-        // Debug.Log($"Sending JSON: {json}"); // Uncomment to debug request
-
-        var req = new UnityWebRequest(ollamaUrl, "POST");
-        req.uploadHandler   = new UploadHandlerRaw(Encoding.UTF8.GetBytes(json));
-        req.downloadHandler = new DownloadHandlerBuffer();
-        req.SetRequestHeader("Content-Type", "application/json");
-
-        yield return req.SendWebRequest();
-
-        if (req.result == UnityWebRequest.Result.Success)
-        {
-            string raw = req.downloadHandler.text;
-            Debug.Log($"<color=yellow>[Ollama raw]</color> {raw.Substring(0, Mathf.Min(raw.Length, 300))}");
-            onResponse?.Invoke(ParseResponse(raw));
-        }
-        else
-            Debug.LogError($"Ollama error: {req.error}");
+        ws.SendText(JsonUtility.ToJson(msg));
     }
 
-    /// <summary>Extract the "response" string value from Ollama JSON by walking escaped quotes properly.</summary>
-    string ParseResponse(string json)
+    void OnMessage(byte[] bytes)
     {
-        string key = "\"response\":";
-        int i = json.IndexOf(key);
-        if (i == -1) return json;
+        string raw = Encoding.UTF8.GetString(bytes);
+        var msg = JsonUtility.FromJson<RelayResponse>(raw);
 
-        // Find the opening quote of the value
-        int q = json.IndexOf('"', i + key.Length);
-        if (q == -1) return json;
-
-        // Walk forward collecting chars, respecting backslash escapes
-        var sb = new StringBuilder();
-        for (int c = q + 1; c < json.Length; c++)
+        if (msg.type == "llm" && pending.TryGetValue(msg.npc, out var cb))
         {
-            if (json[c] == '\\' && c + 1 < json.Length)
-            {
-                char next = json[c + 1];
-                if (next == '"')  { sb.Append('"'); c++; }
-                else if (next == 'n')  { sb.Append('\n'); c++; }
-                else if (next == 't')  { sb.Append('\t'); c++; }
-                else if (next == '\\') { sb.Append('\\'); c++; }
-                else { sb.Append(next); c++; }
-            }
-            else if (json[c] == '"') break; // unescaped quote = end of value
-            else sb.Append(json[c]);
+            pending.Remove(msg.npc);
+            cb?.Invoke(msg.response);
         }
-        return sb.ToString();
+        else if (msg.type == "error")
+            Debug.LogError($"[Relay] {msg.message}");
     }
 }
 
-// Minimal JSON request structures for JsonUtility
+// JSON structures for WebSocket messages
 [System.Serializable]
-class OllamaRequest
+class RelayRequest
 {
+    public string type;
+    public string npc;
     public string model;
     public string prompt;
-    public string system;
-    public bool stream;
-    public OllamaOptions options;
+    public LlmOptions options;
 }
 
 [System.Serializable]
-class OllamaOptions
+class LlmOptions
 {
     public float temperature;
     public float repeat_penalty;
+}
+
+[System.Serializable]
+class RelayResponse
+{
+    public string type;
+    public string npc;
+    public string response;
+    public string message; // for error type
 }
