@@ -10,14 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 0}
-  m_Name: TestDummy_2
+  m_Name: testdummy_obama
   m_EditorClassIdentifier: Assembly-CSharp::NPCProfileAsset
   profile:
-    npcName: flipflop
-    modelName: interviewee_1:latest
-    systemPrompt: you love to stand on mountains and howl because you are a werewolf
-    contextPrompt: full moon on a cliff
-    personalityTraits: wolf
+    npcName: New NPC
+    modelName: qwen3:4b-instruct-2507-q4_K_M
+    systemPrompt: You are a helpful obama assistant.
+    contextPrompt: you are in the white house
+    personalityTraits: super cool
     voiceModelName: en_US-lessac-medium
     temperature: 0.7
     repeatPenalty: 1.1

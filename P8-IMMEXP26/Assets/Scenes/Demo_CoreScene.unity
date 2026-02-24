@@ -460,7 +460,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e338bdfbdad4e2a479dad1df1687fdb2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NpcAgent
-  profileAsset: {fileID: 11400000, guid: 94e326befcb33714fbaf9e097c6423ab, type: 2}
+  profileAsset: {fileID: 11400000, guid: 6ed7d9ed8597c1d4e9dd14303be96fa1, type: 2}
   piperManager: {fileID: 631580301}
   animator: {fileID: 0}
 --- !u!4 &810594016
