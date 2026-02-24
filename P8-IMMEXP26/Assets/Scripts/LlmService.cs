@@ -48,6 +48,7 @@ public class LlmService : MonoBehaviour
             type = "llm",
             npc = npcKey,
             model = profile.modelName,
+            system_prompt = profile.GetSystemPrompt(),
             prompt = userText,
             options = new LlmOptions { temperature = profile.temperature, repeat_penalty = profile.repeatPenalty }
         };
@@ -77,6 +78,7 @@ class RelayRequest
     public string type;
     public string npc;
     public string model;
+    public string system_prompt;
     public string prompt;
     public LlmOptions options;
 }

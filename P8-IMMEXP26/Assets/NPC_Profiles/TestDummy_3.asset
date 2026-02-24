@@ -10,13 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 0}
-  m_Name: TestDummy_1
+  m_Name: TestDummy_3
   m_EditorClassIdentifier: Assembly-CSharp::NPCProfileAsset
   profile:
-    npcName: paul
-    systemPrompt: You just wanna talk about sea food
-    contextPrompt: you are in a seafood all you can eat
-    personalityTraits: super hungry
+    npcName: Omaba
+    modelName: qwen3:4b-instruct-2507-q4_K_M
+    systemPrompt: You are obama
+    contextPrompt: 
+    personalityTraits: 
     voiceModelName: en_US-lessac-medium
     temperature: 0.7
     repeatPenalty: 1.1
