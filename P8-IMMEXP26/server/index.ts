@@ -7,7 +7,7 @@ const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434/api/generat
 // Unity sends:  { model, prompt, options? }
 // Server calls Ollama, returns:  { type:"llm", response }  or  { type:"error", message }
 
-async function queryOllama(body: { model: string; prompt: string; options?: Record<string, number> }) {
+async function queryOllama(body: { model: string; prompt: string; system?: string; options?: Record<string, number> }) {
   const res = await fetch(OLLAMA_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -44,6 +44,7 @@ serve({
           const response = await queryOllama({
             model: msg.model,
             prompt: msg.prompt,
+            system: msg.system_prompt,
             options: msg.options,
           });
           ws.send(JSON.stringify({ type: "llm", npc: msg.npc ?? "", response }));
