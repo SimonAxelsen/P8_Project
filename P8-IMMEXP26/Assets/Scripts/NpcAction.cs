@@ -4,17 +4,17 @@ using UnityEngine;
 /// <summary>
 /// Lightweight non-verbal action extracted from LLM output.
 /// LLM wraps JSON in [META]...[/META] tags at the start of its reply.
-/// Example: [META]{"action":"nod","gaze":"speaker"}[/META] That sounds great!
+/// Example: [META]{"animatorTrigger":"nod","isFocused":true}[/META] That sounds great!
 /// </summary>
 [Serializable]
 public struct NpcAction
 {
-    public string action;   // animator trigger: nod, smile, lean_forward, lean_back, shake_head, idle
-    public string gaze;     // speaker, away, neutral
+    public string animatorTrigger;   // nod, smile, lean_forward, lean_back, shake_head, idle
+    public bool isFocused;           // true = focused on speaker, false = ignoring
 
-    public bool IsEmpty => string.IsNullOrEmpty(action) && string.IsNullOrEmpty(gaze);
+    public bool IsEmpty => string.IsNullOrEmpty(animatorTrigger);
 
-    public static readonly NpcAction None = new NpcAction { action = "idle", gaze = "neutral" };
+    public static readonly NpcAction None = new NpcAction { animatorTrigger = "idle", isFocused = false };
 
     const string OPEN = "[META]";
     const string CLOSE = "[/META]";

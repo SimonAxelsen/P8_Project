@@ -39,12 +39,13 @@ serve({
         const msg = JSON.parse(raw.toString());
 
         if (msg.type === "llm") {
-          // { type:"llm", model, prompt, options? }
-          console.log(`[llm] model=${msg.model}  prompt=${msg.prompt.substring(0, 80)}…`);
+          // NPC profile gets prepended to prompt so Modelfile SYSTEM (META contract) stays intact
+          const npcContext = msg.system_prompt ? `[NPC Profile: ${msg.system_prompt}]\n\n` : "";
+          const fullPrompt = npcContext + msg.prompt;
+          console.log(`[llm] npc=${msg.npc ?? "?"}  model=${msg.model}  prompt=${fullPrompt.substring(0, 120)}…`);
           const response = await queryOllama({
             model: msg.model,
-            prompt: msg.prompt,
-            system: msg.system_prompt,
+            prompt: fullPrompt,
             options: msg.options,
           });
           ws.send(JSON.stringify({ type: "llm", npc: msg.npc ?? "", response }));
