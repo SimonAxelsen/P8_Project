@@ -4,8 +4,7 @@ using System.Collections.Generic;
 using NativeWebSocket;
 
 /// <summary>
-/// Shared LLM service. Connects to the PC relay server via WebSocket.
-/// Each NPC profile has its own Ollama model name (created via Modelfile with baked-in system prompt).
+/// Shared LLM service. Connects to the relay server via WebSocket.
 /// </summary>
 public class LlmService : MonoBehaviour
 {
@@ -14,11 +13,12 @@ public class LlmService : MonoBehaviour
 
     private WebSocket ws;
     private readonly Dictionary<string, System.Action<string>> pending = new();
+    private readonly Dictionary<string, System.Action<string, string>> pendingConv = new();
 
     async void Start()
     {
         ws = new WebSocket(serverUrl);
-        ws.OnOpen    += ()  => Debug.Log("[LlmService] Connected to relay");
+        ws.OnOpen    += ()  => Debug.Log("[LlmService] Connected");
         ws.OnError   += (e) => Debug.LogError($"[LlmService] WS error: {e}");
         ws.OnClose   += (_) => Debug.Log("[LlmService] WS closed");
         ws.OnMessage += OnMessage;
@@ -34,26 +34,45 @@ public class LlmService : MonoBehaviour
 
     async void OnApplicationQuit() => await ws?.Close();
 
-    /// <summary>Send a prompt to the relay server for a specific NPC.</summary>
+    /// <summary>Legacy single-shot prompt for one NPC.</summary>
     public void Ask(string userText, NPCProfile profile, System.Action<string> onResponse)
     {
-        if (ws == null || ws.State != WebSocketState.Open)
-        { Debug.LogError("[LlmService] WebSocket not connected"); return; }
-
-        string npcKey = profile.npcName;
-        pending[npcKey] = onResponse;
-
-        var msg = new RelayRequest
+        if (!IsConnected()) return;
+        pending[profile.npcName] = onResponse;
+        ws.SendText(JsonUtility.ToJson(new RelayRequest
         {
-            type = "llm",
-            npc = npcKey,
-            model = profile.modelName,
-            system_prompt = profile.GetSystemPrompt(),
-            prompt = userText,
+            type = "llm", npc = profile.npcName, model = profile.modelName,
+            system_prompt = profile.GetSystemPrompt(), prompt = userText,
             options = new LlmOptions { temperature = profile.temperature, repeat_penalty = profile.repeatPenalty }
-        };
+        }));
+    }
 
-        ws.SendText(JsonUtility.ToJson(msg));
+    /// <summary>
+    /// Interview conversation turn. Server picks the NPC and responds — one round trip.
+    /// Callback receives (npcName, rawResponse).
+    /// </summary>
+    public void AskConversation(string sessionId, string playerText, NPCProfile a, NPCProfile b, System.Action<string, string> onResponse)
+    {
+        if (!IsConnected()) return;
+        pendingConv[sessionId] = onResponse;
+        ws.SendText(JsonUtility.ToJson(new ConversationRequest
+        {
+            type = "conversation_turn", session = sessionId, prompt = playerText,
+            npcs = new NpcInfoArray
+            {
+                npc0_name = a.npcName, npc0_system = a.GetSystemPrompt(), npc0_model = a.modelName,
+                npc0_temp = a.temperature, npc0_repeat = a.repeatPenalty,
+                npc1_name = b.npcName, npc1_system = b.GetSystemPrompt(), npc1_model = b.modelName,
+                npc1_temp = b.temperature, npc1_repeat = b.repeatPenalty
+            }
+        }));
+    }
+
+    bool IsConnected()
+    {
+        if (ws == null || ws.State != WebSocketState.Open)
+        { Debug.LogError("[LlmService] Not connected"); return false; }
+        return true;
     }
 
     void OnMessage(byte[] bytes)
@@ -62,39 +81,32 @@ public class LlmService : MonoBehaviour
         var msg = JsonUtility.FromJson<RelayResponse>(raw);
 
         if (msg.type == "llm" && pending.TryGetValue(msg.npc, out var cb))
-        {
-            pending.Remove(msg.npc);
-            cb?.Invoke(msg.response);
-        }
+        { pending.Remove(msg.npc); cb?.Invoke(msg.response); }
+        else if (msg.type == "conversation_turn" && pendingConv.TryGetValue(msg.session, out var ccb))
+        { pendingConv.Remove(msg.session); ccb?.Invoke(msg.npc, msg.response); }
         else if (msg.type == "error")
             Debug.LogError($"[Relay] {msg.message}");
     }
 }
 
-// JSON structures for WebSocket messages
+// ── JSON wire types ─────────────────────────────────────────────
+
+[System.Serializable] class RelayRequest { public string type, npc, model, system_prompt, prompt; public LlmOptions options; }
+[System.Serializable] class LlmOptions { public float temperature, repeat_penalty; }
+[System.Serializable] class RelayResponse { public string type, npc, response, message, session; }
+
 [System.Serializable]
-class RelayRequest
+class NpcInfoArray
 {
-    public string type;
-    public string npc;
-    public string model;
-    public string system_prompt;
-    public string prompt;
-    public LlmOptions options;
+    public string npc0_name, npc0_system, npc0_model;
+    public float npc0_temp, npc0_repeat;
+    public string npc1_name, npc1_system, npc1_model;
+    public float npc1_temp, npc1_repeat;
 }
 
 [System.Serializable]
-class LlmOptions
+class ConversationRequest
 {
-    public float temperature;
-    public float repeat_penalty;
-}
-
-[System.Serializable]
-class RelayResponse
-{
-    public string type;
-    public string npc;
-    public string response;
-    public string message; // for error type
+    public string type, session, prompt;
+    public NpcInfoArray npcs;
 }

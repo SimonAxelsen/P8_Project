@@ -4,6 +4,7 @@ using Whisper;
 public class VoiceTest : MonoBehaviour
 {
     public WhisperManager whisperManager;
+    public ConversationManager conversationManager;
     
     [Header("Dev")]
     public bool useTextInput = false;
@@ -94,6 +95,15 @@ public class VoiceTest : MonoBehaviour
     void Broadcast(string text)
     {
         Debug.Log($"<color=white>[Broadcast]</color> {text}");
+
+        // If a ConversationManager is assigned, use the interview conversation system
+        if (conversationManager != null)
+        {
+            conversationManager.HandlePlayerInput(text);
+            return;
+        }
+
+        // Fallback: legacy broadcast to all agents individually
         foreach (var agent in FindObjectsOfType<NpcAgent>())
             agent.Say(text);
     }

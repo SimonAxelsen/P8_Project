@@ -1,9 +1,9 @@
 using UnityEngine;
+using System.Collections;
 using Piper;
 
 /// <summary>
-/// Attach to each NPC GameObject. Holds its own profile, audio, and talks to the shared LlmService.
-/// Parses [META] non-verbal actions from LLM output and fires animator triggers.
+/// Attach to each NPC GameObject. Holds profile, audio, and talks to LlmService.
 /// </summary>
 public class NpcAgent : MonoBehaviour
 {
@@ -18,6 +18,9 @@ public class NpcAgent : MonoBehaviour
 
     private AudioSource audioSource;
     private LlmService llm;
+    private Coroutine speakCoroutine;
+
+    public bool IsSpeaking => audioSource != null && audioSource.isPlaying;
 
     void Start()
     {
@@ -27,40 +30,54 @@ public class NpcAgent : MonoBehaviour
         if (animator == null)    animator = GetComponentInChildren<Animator>();
     }
 
-    /// <summary>Send a user message to this agent's LLM personality.</summary>
+    /// <summary>Legacy single-shot: send text, get response, play TTS.</summary>
     public void Say(string userText)
     {
-        if (Profile == null) { Debug.LogWarning($"{name}: No NPC profile assigned!"); return; }
-        llm.Ask(userText, Profile, OnLlmResponse);
+        if (Profile == null) return;
+        llm.Ask(userText, Profile, raw =>
+        {
+            var (action, dialogue) = NpcAction.Parse(raw);
+            ApplyAction(action);
+            OnActionReceived?.Invoke(action);
+            OnResponseReceived?.Invoke(dialogue);
+            if (piperManager != null) SpeakFire(dialogue);
+        });
     }
 
-    void OnLlmResponse(string raw)
-    {
-        // RAW output (Ollama modelfile + NPC profile) — META tags visible for dev
-        Debug.Log($"<color=yellow>[{Profile.npcName} RAW]</color> {raw}");
-
-        var (action, dialogue) = NpcAction.Parse(raw);
-
-        // Clean dialogue (META stripped) — this is what TTS will speak
-        Debug.Log($"<color=cyan>[{Profile.npcName} TTS]</color> {dialogue}");
-
-        ApplyAction(action);
-        OnActionReceived?.Invoke(action);
-        OnResponseReceived?.Invoke(dialogue);
-
-        if (piperManager != null) Speak(dialogue);
-    }
-
-    void ApplyAction(NpcAction action)
+    public void ApplyAction(NpcAction action)
     {
         if (animator == null || string.IsNullOrEmpty(action.animatorTrigger)) return;
         try { animator.SetTrigger(action.animatorTrigger); }
-        catch { Debug.LogWarning($"{name}: Animator has no trigger '{action.animatorTrigger}'"); }
+        catch { Debug.LogWarning($"{name}: No trigger '{action.animatorTrigger}'"); }
     }
 
-    async void Speak(string text)
+    /// <summary>Fire-and-forget TTS (for legacy Say flow).</summary>
+    async void SpeakFire(string text)
     {
         var clip = await piperManager.TextToSpeech(text);
         if (clip != null) { audioSource.clip = clip; audioSource.Play(); }
+    }
+
+    /// <summary>TTS with completion callback. Used by ConversationManager.</summary>
+    public void SpeakWithCallback(string text, System.Action onComplete)
+    {
+        if (piperManager == null) { onComplete?.Invoke(); return; }
+        if (speakCoroutine != null) StopCoroutine(speakCoroutine);
+        speakCoroutine = StartCoroutine(SpeakAndWait(text, onComplete));
+    }
+
+    IEnumerator SpeakAndWait(string text, System.Action onComplete)
+    {
+        var task = piperManager.TextToSpeech(text);
+        while (!task.IsCompleted) yield return null;
+
+        var clip = task.Result;
+        if (clip != null)
+        {
+            audioSource.clip = clip;
+            audioSource.Play();
+            while (audioSource.isPlaying) yield return null;
+        }
+        onComplete?.Invoke();
     }
 }
