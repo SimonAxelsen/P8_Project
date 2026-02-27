@@ -16,3 +16,6 @@ To keep the repo light, the Speech Recognition model is not included. You must i
    <kbd>Assets</kbd> ▸ <kbd>StreamingAssets</kbd> ▸ <kbd>Whisper</kbd>
 
 > **Note:** If the `<kbd>Whisper</kbd>` folder doesn't exist, please create it.
+>
+How to create custom LLM with modeifile
+ollama create interviewee_1 -f Modelfile.interviewer
