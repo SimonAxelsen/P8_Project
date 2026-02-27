@@ -17,5 +17,50 @@ To keep the repo light, the Speech Recognition model is not included. You must i
 
 > **Note:** If the `<kbd>Whisper</kbd>` folder doesn't exist, please create it.
 >
-How to create custom LLM with modeifile
+# How to Create a Custom LLM with Ollama Modelfile
+
+---
+
+## Step 1: Navigate to the Modelfiles Folder
+
+Open your terminal and go to the correct directory:
+
+```bash
+cd P8_Project\P8-IMMEXP26\server\modelfiles
+```
+Make sure your Modelfile exists in this folder  
+(example: `Modelfile.interviewer`).
+
+---
+
+## Step 2: Create the Custom Model
+
+Run the following command:
+
+```bash
 ollama create interviewee_1 -f Modelfile.interviewer
+```
+
+## Step 3: Run Your Custom Model
+
+After the model is successfully created:
+
+```bash
+ollama run interviewee_1
+```
+
+---
+
+## Optional: List Installed Models
+
+```bash
+ollama list
+```
+
+---
+
+## Optional: Remove the Model
+
+```bash
+ollama rm interviewee_1
+```
