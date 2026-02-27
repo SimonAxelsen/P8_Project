@@ -16,6 +16,7 @@
     "com.unity.xr.hands": "1.7.2",
     "com.unity.xr.interaction.toolkit": "3.3.1",
     "com.unity.xr.management": "4.5.3",
+    "com.unity.xr.oculus": "4.5.4",
     "com.unity.xr.openxr": "1.16.1",
     "com.whisper.unity": "https://github.com/macoron/whisper.unity.git?path=/Packages/com.whisper.unity",
     "com.unity.modules.accessibility": "1.0.0",
