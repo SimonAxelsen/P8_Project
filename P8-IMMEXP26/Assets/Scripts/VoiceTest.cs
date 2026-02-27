@@ -1,10 +1,15 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using Whisper;
 
 public class VoiceTest : MonoBehaviour
 {
     public WhisperManager whisperManager;
-    
+
+    [Header("Input")]
+    [Tooltip("Drag the XRI Right Interaction -> Activate action here")]
+    public InputActionReference recordAction;
+
     [Header("Dev")]
     public bool useTextInput = false;
 
@@ -22,13 +27,18 @@ public class VoiceTest : MonoBehaviour
 
     void Update()
     {
+        // 1. Dev Text Input Toggle (Using direct keyboard check for simplicity)
         if (useTextInput)
         {
-            if (Input.GetKeyDown(KeyCode.Return) && !_showInput) _showInput = true;
+            if (Keyboard.current != null && Keyboard.current.enterKey.wasPressedThisFrame && !_showInput)
+            {
+                _showInput = true;
+            }
             return;
         }
 
-        if (Input.GetKeyDown(KeyCode.Space))
+        // 2. New Input System check for Recording (VR Trigger or Spacebar)
+        if (recordAction != null && recordAction.action.WasPressedThisFrame())
         {
             if (Microphone.IsRecording(_micDevice)) StopAndTranscribe();
             else StartRecording();
@@ -44,6 +54,8 @@ public class VoiceTest : MonoBehaviour
         GUI.SetNextControlName("DevInput");
         _typedText = GUILayout.TextField(_typedText, GUILayout.Width(400));
         GUI.FocusControl("DevInput");
+
+        // Event.current works perfectly fine inside OnGUI, no need to change this line!
         if (GUILayout.Button("Send", GUILayout.Width(60)) || (Event.current.isKey && Event.current.keyCode == KeyCode.Return))
         {
             if (!string.IsNullOrEmpty(_typedText)) { Broadcast(_typedText); _typedText = ""; _showInput = false; }
@@ -54,7 +66,7 @@ public class VoiceTest : MonoBehaviour
 
     void StartRecording()
     {
-        Debug.Log("Recording... (Press Space to stop)");
+        Debug.Log("Recording... (Press Space/Trigger to stop)");
         _clip = Microphone.Start(_micDevice, false, 10, 16000);
     }
 
