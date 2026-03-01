@@ -81,7 +81,8 @@ public class LlmService : MonoBehaviour
     if (baseMsg.type == "bc_trigger")
     {
         var bc = JsonUtility.FromJson<BcTriggerMsg>(raw);
-        OnBackchannel?.Invoke(bc.npc, bc.action);
+            Debug.Log($"[BC] npc={bc.npc} action={bc.action}");
+            OnBackchannel?.Invoke(bc.npc, bc.action);
         return;
     }
 
@@ -97,11 +98,7 @@ public class LlmService : MonoBehaviour
 
 }
 
-public void SendBackchannelFeatures(BcFeatures features)
-{
-    if (ws == null || ws.State != WebSocketState.Open) return;
-    ws.SendText(JsonUtility.ToJson(features));
-}
+
 
 [System.Serializable]
 public class BcFeatures
@@ -120,6 +117,23 @@ public class AgentsSpeaking
     public bool HR;
     public bool TECH;
 }
+    private float _bcLogCooldown;
+
+    public void SendBackchannelFeatures(BcFeatures features)
+    {
+        if (ws == null || ws.State != WebSocketState.Open) return;
+
+        ws.SendText(JsonUtility.ToJson(features));
+
+        _bcLogCooldown += Time.deltaTime;
+        if (_bcLogCooldown >= 1f)
+        {
+            _bcLogCooldown = 0f;
+            Debug.Log($"[BC->Server] vad={features.vad} pauseMs={features.pauseMs:F0} speechMs={features.speechMs:F0} addr={features.addressee}");
+        }
+    }
+
+
 
 }
 
