@@ -12,6 +12,9 @@ public class LlmService : MonoBehaviour
     [Header("Relay Server")]
     public string serverUrl = "ws://localhost:3000";
 
+    // Backchannel trigger from server.
+    public System.Action<string, string> OnBackchannel;
+
     private WebSocket ws;
     private readonly Dictionary<string, System.Action<string>> pending = new();
 
@@ -57,18 +60,67 @@ public class LlmService : MonoBehaviour
     }
 
     void OnMessage(byte[] bytes)
-    {
-        string raw = Encoding.UTF8.GetString(bytes);
-        var msg = JsonUtility.FromJson<RelayResponse>(raw);
+{
+    string raw = Encoding.UTF8.GetString(bytes);
 
-        if (msg.type == "llm" && pending.TryGetValue(msg.npc, out var cb))
+    var baseMsg = JsonUtility.FromJson<BaseMsg>(raw);
+    if (baseMsg == null || string.IsNullOrEmpty(baseMsg.type))
+        return;
+
+    if (baseMsg.type == "llm")
+    {
+        var msg = JsonUtility.FromJson<RelayResponse>(raw);
+        if (pending.TryGetValue(msg.npc, out var cb))
         {
             pending.Remove(msg.npc);
             cb?.Invoke(msg.response);
         }
-        else if (msg.type == "error")
-            Debug.LogError($"[Relay] {msg.message}");
+        return;
     }
+
+    if (baseMsg.type == "bc_trigger")
+    {
+        var bc = JsonUtility.FromJson<BcTriggerMsg>(raw);
+        OnBackchannel?.Invoke(bc.npc, bc.action);
+        return;
+    }
+
+    if (baseMsg.type == "error")
+    {
+        var err = JsonUtility.FromJson<RelayResponse>(raw);
+        Debug.LogError($"[Relay] {err.message}");
+        return;
+    }
+
+    
+
+
+}
+
+public void SendBackchannelFeatures(BcFeatures features)
+{
+    if (ws == null || ws.State != WebSocketState.Open) return;
+    ws.SendText(JsonUtility.ToJson(features));
+}
+
+[System.Serializable]
+public class BcFeatures
+{
+    public string type = "bc_features";
+    public int vad;           // 0/1
+    public float pauseMs;
+    public float speechMs;
+    public string addressee;  // "HR"/"TECH"/"UNKNOWN"
+    public AgentsSpeaking agentsSpeaking = new AgentsSpeaking();
+}
+
+[System.Serializable]
+public class AgentsSpeaking
+{
+    public bool HR;
+    public bool TECH;
+}
+
 }
 
 // JSON structures for WebSocket messages
@@ -97,4 +149,15 @@ class RelayResponse
     public string npc;
     public string response;
     public string message; // for error type
+}
+
+[System.Serializable]
+class BaseMsg { public string type; }
+
+[System.Serializable]
+class BcTriggerMsg
+{
+    public string type;   // "bc_trigger"
+    public string npc;    // "HR" or "TECH"
+    public string action; // animator trigger
 }
