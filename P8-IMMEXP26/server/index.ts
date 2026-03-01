@@ -132,6 +132,7 @@ serve({
     async message(ws, raw) {
       try {
         const msg = JSON.parse(raw.toString());
+        console.log("[ws] type:", msg.type, "npc:", msg.npc);
 
                    //Checks for BC  features / piggyback of features and triggers.
         if (msg.type === "bc_features") {

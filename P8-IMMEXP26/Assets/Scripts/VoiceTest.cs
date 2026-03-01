@@ -21,8 +21,27 @@ public class VoiceTest : MonoBehaviour
     void Start()
     {
         if (whisperManager == null) whisperManager = GetComponent<WhisperManager>();
-        if (Microphone.devices.Length > 0) _micDevice = Microphone.devices[0];
-        else Debug.LogError("No Microphone detected!");
+
+        Debug.Log("Mics: " + string.Join(", ", Microphone.devices));
+        if (Microphone.devices.Length == 0)
+        {
+            Debug.LogError("No Microphone detected!");
+            return;
+        }
+
+        // Prefer a headset/VR mic if present, otherwise fallback to first
+        _micDevice = Microphone.devices[0];
+        foreach (var d in Microphone.devices)
+        {
+            var name = d.ToLower();
+            if (name.Contains("oculus") || name.Contains("quest") || name.Contains("headset") || name.Contains("vr") || name.Contains("steam"))
+            {
+                _micDevice = d;
+                break;
+            }
+        }
+
+        Debug.Log("Using mic: " + _micDevice);
     }
 
     void Update()

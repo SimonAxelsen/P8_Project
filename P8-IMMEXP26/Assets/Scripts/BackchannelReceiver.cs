@@ -11,7 +11,9 @@ public class BackchannelReceiver : MonoBehaviour
     {
         llm = FindObjectOfType<LlmService>();
         llm.OnBackchannel += HandleBackchannel;
+        
     }
+
 
     void OnDestroy()
     {
