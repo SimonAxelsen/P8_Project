@@ -2,7 +2,7 @@ import { serve } from "bun";
 import { appendFileSync } from "fs";
 import { join } from "path";
 
-const PORT = 3000;
+const PORT = 3001;
 const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434/api/generate";
 const LOG_FILE = join(import.meta.dir, "chat_log.jsonl");
 

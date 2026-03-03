@@ -678,7 +678,7 @@ GameObject:
   - component: {fileID: 631580304}
   - component: {fileID: 631580303}
   m_Layer: 0
-  m_Name: PiperTTS
+  m_Name: NPCAGENT
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3324,7 +3324,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6b88e632ef755d4d8a887f234fee276, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LlmManager
-  serverUrl: ws://localhost:3000
+  serverUrl: ws://172.20.10.6:3001
 --- !u!4 &1360984289 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6330137943872267642, guid: cd4195b114f03394ba11acf53729517c, type: 3}
@@ -3387,7 +3387,7 @@ GameObject:
   - component: {fileID: 1791838159}
   - component: {fileID: 1791838160}
   m_Layer: 0
-  m_Name: PiperTTS
+  m_Name: NPCAGENT
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
