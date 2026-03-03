@@ -10,14 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 0}
-  m_Name: TestDummy_3
+  m_Name: Testdummy_3
   m_EditorClassIdentifier: Assembly-CSharp::NPCProfileAsset
   profile:
-    npcName: Omaba
-    modelName: qwen3:4b-instruct-2507-q4_K_M
-    systemPrompt: You are obama
-    contextPrompt: 
-    personalityTraits: 
+    npcName: Tech Interviewer
+    modelName: interviewee_1:latest
+    systemPrompt: You conduct technical interviews. You assess problem-solving, coding
+      knowledge, and technical communication
+    contextPrompt: You're interviewing for an entry-level position. Your colleague
+      handles behavioral questions. You observe first, then take over for technical
+      deep-dives
+    personalityTraits: Direct, curious, analytical. Asks follow-up questions. Interested
+      in thought process over correct answers.
     voiceModelName: en_US-lessac-medium
     temperature: 0.7
     repeatPenalty: 1.1
