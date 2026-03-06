@@ -1,10 +1,14 @@
-import { serve } from "bun";
+import { serve, type ServerWebSocket } from "bun";
 import { appendFileSync } from "fs";
 import { join } from "path";
+import { sendElevenLabsTts } from "./elevenlabs";
 
 const PORT = 3001;
 const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434/api/generate";
 const LOG_FILE = join(import.meta.dir, "chat_log.jsonl");
+
+// Flip this one line to turn ElevenLabs on/off (plus set ELEVENLABS_API_KEY in .env).
+const ENABLE_ELEVENLABS = true;
 
 // Append one JSON line to the log file (sync is fine for small writes)
 function log(entry: Record<string, unknown>) {
@@ -25,8 +29,6 @@ async function queryOllama(body: { model: string; prompt: string; system?: strin
   const json = (await res.json()) as { response?: string };
   return json.response ?? "";
 }
-
-
 
 // ── Backchannel  trigger logic 
 type NpcKey = "HR" | "TECH";
@@ -129,7 +131,7 @@ serve({
       ws.send(JSON.stringify({ type: "connected" }));
     },
 
-    async message(ws, raw) {
+    async message(ws: ServerWebSocket<unknown>, raw) {
       try {
         const msg = JSON.parse(raw.toString());
 
@@ -158,6 +160,11 @@ serve({
           });
           log({ role: "assistant", npc: msg.npc, response });
           ws.send(JSON.stringify({ type: "llm", npc: msg.npc ?? "", response }));
+
+          // Optional: ElevenLabs TTS — one-line toggle via ENABLE_ELEVENLABS above.
+          if (ENABLE_ELEVENLABS) {
+            await sendElevenLabsTts(ws, msg, response);
+          }
         } else {
           // Passthrough / echo for other message types
           ws.send(JSON.stringify({ type: "echo", data: raw.toString() }));

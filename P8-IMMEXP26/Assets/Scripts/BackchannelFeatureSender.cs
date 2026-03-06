@@ -84,14 +84,14 @@ public class BackchannelFeatureSender : MonoBehaviour
         if (sendTimer >= sendEveryMs)
         {
             sendTimer = 0;
-            var msg = new LlmService.BcFeatures
+            var msg = new BcFeatures
             {
                 type = "bc_features",
                 vad = vad ? 1 : 0,
                 pauseMs = pauseMs,
                 speechMs = speechMs,
                 addressee = addressee,
-                agentsSpeaking = new LlmService.AgentsSpeaking { HR = false, TECH = false } // wire this later
+                agentsSpeaking = new AgentsSpeaking { HR = false, TECH = false } // wire this later
             };
             llm.SendBackchannelFeatures(msg);
         }

@@ -1,4 +1,5 @@
 using UnityEngine;
+using System;
 using System.Text;
 using System.Collections.Generic;
 using NativeWebSocket;
@@ -10,13 +11,27 @@ using NativeWebSocket;
 public class LlmService : MonoBehaviour
 {
     [Header("Relay Server")]
-    public string serverUrl = "ws://localhost:3000";
+    public string serverUrl = "ws://localhost:3001";
+
+    [Header("ElevenLabs (server TTS)")]
+    [Tooltip("When true, play server ElevenLabs audio and skip local Piper for replies.")]
+    public bool useElevenLabsAudio = false;
+    [Tooltip("Optional. If unset, uses an AudioSource on this GameObject.")]
+    public AudioSource elevenLabsAudioSource;
 
     // Backchannel trigger from server.
     public System.Action<string, string> OnBackchannel;
 
     private WebSocket ws;
     private readonly Dictionary<string, System.Action<string>> pending = new();
+
+    void Awake()
+    {
+        if (useElevenLabsAudio && elevenLabsAudioSource == null)
+            elevenLabsAudioSource = GetComponent<AudioSource>();
+        if (useElevenLabsAudio && elevenLabsAudioSource == null)
+            elevenLabsAudioSource = gameObject.AddComponent<AudioSource>();
+    }
 
     async void Start()
     {
@@ -92,15 +107,59 @@ public class LlmService : MonoBehaviour
         return;
     }
 
-    
+    if (baseMsg.type == "audio")
+    {
+        var audioMsg = JsonUtility.FromJson<AudioMsg>(raw);
+        if (audioMsg != null && useElevenLabsAudio && elevenLabsAudioSource != null && audioMsg.format == "pcm" && audioMsg.sampleRate > 0 && !string.IsNullOrEmpty(audioMsg.data))
+        {
+            AudioClip clip = DecodePcmToClip(audioMsg.data, audioMsg.sampleRate);
+            if (clip != null)
+            {
+                elevenLabsAudioSource.clip = clip;
+                elevenLabsAudioSource.Play();
+                Debug.Log($"[LlmService] Playing ElevenLabs audio for npc={audioMsg.npc}, length={clip.length:F1}s");
+            }
+            else
+                Debug.LogWarning("[LlmService] ElevenLabs audio received but PCM decode failed.");
+        }
+        else if (audioMsg != null && !useElevenLabsAudio)
+            Debug.Log("[LlmService] ElevenLabs audio received; enable 'Use ElevenLabs Audio' on LlmService to hear it.");
+        else if (audioMsg != null && useElevenLabsAudio && elevenLabsAudioSource == null)
+            Debug.LogWarning("[LlmService] ElevenLabs audio received but no AudioSource (add one or enable Use ElevenLabs Audio).");
+        return;
+    }
+    }
 
+    /// <summary>Decode base64 PCM 16-bit LE to Unity AudioClip (mono).</summary>
+    static AudioClip DecodePcmToClip(string base64, int sampleRate)
+    {
+        try
+        {
+            byte[] bytes = Convert.FromBase64String(base64);
+            int sampleCount = bytes.Length / 2;
+            float[] floats = new float[sampleCount];
+            for (int i = 0; i < sampleCount; i++)
+            {
+                int s = bytes[i * 2] | (bytes[i * 2 + 1] << 8);
+                if (s >= 32768) s -= 65536;
+                floats[i] = s / 32768f;
+            }
+            AudioClip clip = AudioClip.Create("ElevenLabs", sampleCount, 1, sampleRate, false);
+            clip.SetData(floats, 0);
+            return clip;
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[LlmService] PCM decode failed: {e.Message}");
+            return null;
+        }
+    }
 
-}
-
-public void SendBackchannelFeatures(BcFeatures features)
-{
-    if (ws == null || ws.State != WebSocketState.Open) return;
-    ws.SendText(JsonUtility.ToJson(features));
+    public void SendBackchannelFeatures(BcFeatures features)
+    {
+        if (ws == null || ws.State != WebSocketState.Open) return;
+        ws.SendText(JsonUtility.ToJson(features));
+    }
 }
 
 [System.Serializable]
@@ -119,8 +178,6 @@ public class AgentsSpeaking
 {
     public bool HR;
     public bool TECH;
-}
-
 }
 
 // JSON structures for WebSocket messages
@@ -160,4 +217,14 @@ class BcTriggerMsg
     public string type;   // "bc_trigger"
     public string npc;    // "HR" or "TECH"
     public string action; // animator trigger
+}
+
+[System.Serializable]
+class AudioMsg
+{
+    public string type;
+    public string npc;
+    public string format;  // "pcm"
+    public int sampleRate;
+    public string data;    // base64
 }

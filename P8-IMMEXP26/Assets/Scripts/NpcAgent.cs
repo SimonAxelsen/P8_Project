@@ -48,7 +48,11 @@ public class NpcAgent : MonoBehaviour
         OnActionReceived?.Invoke(action);
         OnResponseReceived?.Invoke(dialogue);
 
-        if (piperManager != null) Speak(dialogue);
+        // When LlmService is using ElevenLabs, it plays server audio; skip local Piper to avoid double playback.
+        if (llm != null && llm.useElevenLabsAudio)
+            return;
+        if (piperManager != null)
+            Speak(dialogue);
     }
 
     void ApplyAction(NpcAction action)
