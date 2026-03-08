@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: e25662c82ddd23943832e40a90780020
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Prefabs/Office/Office Variant.prefab
+  uploadId: 829404
