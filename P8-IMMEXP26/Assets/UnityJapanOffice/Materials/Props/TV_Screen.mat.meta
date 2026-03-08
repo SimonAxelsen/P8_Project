@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0fc475eb3de3f0745bf752a032342834
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Materials/Props/TV_Screen.mat
+  uploadId: 829404

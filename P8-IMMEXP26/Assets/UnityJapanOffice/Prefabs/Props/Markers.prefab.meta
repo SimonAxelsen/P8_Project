@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 3eee7559db839ea48b531d58a81b53fa
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Prefabs/Props/Markers.prefab
+  uploadId: 829404

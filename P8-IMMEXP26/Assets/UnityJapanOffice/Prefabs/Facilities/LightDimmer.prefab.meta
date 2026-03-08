@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: af29e35fe864fc44589d46fdc5cdfb0c
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Prefabs/Facilities/LightDimmer.prefab
+  uploadId: 829404

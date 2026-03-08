@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1c698dba3c3e3ba4fb72f2da6b81cb8b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Materials/Office/Cabinet_D.mat
+  uploadId: 829404

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 52a8df503b7f116439465f2b2c2d393a
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Prefabs/Props/Projector.prefab
+  uploadId: 829404

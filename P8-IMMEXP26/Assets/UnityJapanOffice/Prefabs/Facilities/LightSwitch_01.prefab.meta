@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 8b7642653bc4800468244722c74dc2f1
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Prefabs/Facilities/LightSwitch_01.prefab
+  uploadId: 829404

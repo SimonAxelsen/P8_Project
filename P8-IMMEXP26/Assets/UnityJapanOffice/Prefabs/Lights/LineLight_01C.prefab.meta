@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 40a7612adee6d504f8d7ccef4116cac1
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Prefabs/Lights/LineLight_01C.prefab
+  uploadId: 829404
