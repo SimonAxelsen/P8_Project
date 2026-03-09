@@ -1,49 +1,132 @@
 using UnityEngine;
+using System.Collections;
 
 [RequireComponent(typeof(Animator))]
 public class EyeContactIK : MonoBehaviour
 {
-    [Header("What should the agent look at?")]
+    [Header("Targets")]
+    [Tooltip("The User (Main Camera)")]
     public Transform target;
+    [Tooltip("Drag the OTHER agent's Head bone or eye target here!")]
+    public Transform coAgentTarget;
 
     [Header("Tracking Weights")]
-    [Tooltip("Global weight. 0 turns it off, 1 turns it fully on.")]
     [Range(0f, 1f)] public float overallWeight = 1.0f;
-
-    [Tooltip("How much the spine twists")]
     [Range(0f, 1f)] public float bodyWeight = 0.05f;
-
-    [Tooltip("How much the head turns")]
     [Range(0f, 1f)] public float headWeight = 0.6f;
-
-    [Tooltip("How much the eye bones track the target")]
     [Range(0f, 1f)] public float eyesWeight = 1.0f;
-
-    [Tooltip("How far they can turn before giving up")]
     [Range(0f, 1f)] public float clampWeight = 0.5f;
 
     private Animator animator;
+    private float currentWeight = 1.0f;
+    private Coroutine weightCoroutine;
+    private Vector3 targetOffset = Vector3.zero;
+
+    // NEW: 0 means look at User, 1 means look at Co-Agent
+    private float gazeBlend = 0f;
 
     void Start()
     {
         animator = GetComponent<Animator>();
+        currentWeight = overallWeight;
     }
 
-    // This is Unity's built-in callback for IK manipulation
     void OnAnimatorIK(int layerIndex)
     {
         if (animator != null && target != null)
         {
-            // Tell the animator HOW MUCH to look at the target
-            animator.SetLookAtWeight(overallWeight, bodyWeight, headWeight, eyesWeight, clampWeight);
+            animator.SetLookAtWeight(currentWeight, bodyWeight, headWeight, eyesWeight, clampWeight);
 
-            // Tell the animator WHERE to look
-            animator.SetLookAtPosition(target.position);
+            // If we have a co-agent, lerp between the user and the co-agent
+            if (coAgentTarget != null)
+            {
+                Vector3 finalPos = Vector3.Lerp(target.position + targetOffset, coAgentTarget.position, gazeBlend);
+                animator.SetLookAtPosition(finalPos);
+            }
+            else
+            {
+                // Fallback to normal offset if no co-agent is assigned
+                animator.SetLookAtPosition(target.position + targetOffset);
+            }
         }
         else if (animator != null)
         {
-            // Reset to 0 if there is no target
             animator.SetLookAtWeight(0);
         }
+    }
+
+    public void SmoothTransitionWeight(float targetW, float duration)
+    {
+        if (weightCoroutine != null) StopCoroutine(weightCoroutine);
+        weightCoroutine = StartCoroutine(LerpWeight(targetW, duration));
+    }
+
+    private IEnumerator LerpWeight(float targetW, float duration)
+    {
+        float startW = currentWeight;
+        float time = 0;
+        while (time < duration)
+        {
+            currentWeight = Mathf.Lerp(startW, targetW, time / duration);
+            time += Time.deltaTime;
+            yield return null;
+        }
+        currentWeight = targetW;
+    }
+
+    // --- NEW PROCEDURAL NOD LOGIC ---
+    public void TriggerProceduralNod(float duration = 1.0f)
+    {
+        StartCoroutine(NodRoutine(duration));
+    }
+
+    private IEnumerator NodRoutine(float duration)
+    {
+        float time = 0;
+        // This simulates a "down, center, up, center" motion using a sine wave
+        while (time < duration)
+        {
+            // The 0.15f is the intensity of the nod. Increase it for a bigger nod!
+            float yOffset = Mathf.Sin((time / duration) * Mathf.PI * 2) * -0.15f;
+            targetOffset = new Vector3(0, yOffset, 0);
+
+            time += Time.deltaTime;
+            yield return null;
+        }
+        targetOffset = Vector3.zero; // Reset perfectly
+    }
+
+    public void TriggerProceduralGazeAversion(float duration = 2.5f)
+    {
+        StartCoroutine(GazeAversionRoutine(duration));
+    }
+
+    private IEnumerator GazeAversionRoutine(float duration)
+    {
+        // 1. Slowed down the transition from 0.4s to 1.2s for a natural turn
+        float transitionTime = 0.7f;
+
+        float t = 0;
+        while (t < transitionTime)
+        {
+            // 2. Added SmoothStep for natural acceleration/deceleration
+            float easedTime = Mathf.SmoothStep(0f, 1f, t / transitionTime);
+            gazeBlend = Mathf.Lerp(0f, 1f, easedTime);
+            t += Time.deltaTime;
+            yield return null;
+        }
+        gazeBlend = 1f;
+
+        yield return new WaitForSeconds(duration - (transitionTime * 2));
+
+        t = 0;
+        while (t < transitionTime)
+        {
+            float easedTime = Mathf.SmoothStep(0f, 1f, t / transitionTime);
+            gazeBlend = Mathf.Lerp(1f, 0f, easedTime);
+            t += Time.deltaTime;
+            yield return null;
+        }
+        gazeBlend = 0f;
     }
 }

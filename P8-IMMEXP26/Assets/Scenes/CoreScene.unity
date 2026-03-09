@@ -124,6 +124,11 @@ SkinnedMeshRenderer:
   m_CorrespondingSourceObject: {fileID: 6117092401324102548, guid: 40eb9d5438f3d1a4793ae7749ef4c3ad, type: 3}
   m_PrefabInstance: {fileID: 1913966189}
   m_PrefabAsset: {fileID: 0}
+--- !u!4 &107090926 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3308767243497388623, guid: cd4195b114f03394ba11acf53729517c, type: 3}
+  m_PrefabInstance: {fileID: 1081854095}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &133278564 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6223764411703415636, guid: cd4195b114f03394ba11acf53729517c, type: 3}
@@ -198,12 +203,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 312620076}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.65, z: 0.5}
+  m_LocalRotation: {x: -0.00092583895, y: 0.0005946669, z: -0.0000038087635, w: 0.99999946}
+  m_LocalPosition: {x: 0, y: 0.044, z: 0.205}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 450643423}
+  m_Father: {fileID: 107090926}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &348030011 stripped
 Transform:
@@ -239,12 +244,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 363116605}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.65, z: 0.5}
+  m_LocalRotation: {x: -0.00092583895, y: 0.0005946669, z: -0.0000038087635, w: 0.99999946}
+  m_LocalPosition: {x: 0.023, y: 0.041, z: 0.404}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 707502114}
+  m_Father: {fileID: 1041432196}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &438049124
 GameObject:
@@ -468,6 +473,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   target: {fileID: 1408642648}
+  coAgentTarget: {fileID: 363116606}
   overallWeight: 1
   bodyWeight: 0.05
   headWeight: 0.6
@@ -499,6 +505,11 @@ MonoBehaviour:
   twitchSpeed: 0.15
   minTimeBetweenTwitches: 1.5
   maxTimeBetweenTwitches: 4
+--- !u!95 &450643428 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 5787815445450442815, guid: cd4195b114f03394ba11acf53729517c, type: 3}
+  m_PrefabInstance: {fileID: 1081854095}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &492102558
 GameObject:
   m_ObjectHideFlags: 0
@@ -558,7 +569,7 @@ Light:
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1, g: 0.95686275, b: 0.8392157, a: 1}
-  m_Intensity: 100000
+  m_Intensity: 2.55
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -789,6 +800,8 @@ MonoBehaviour:
   whisperManager: {fileID: 1354645184}
   recordAction: {fileID: 83097790271614945, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   useTextInput: 0
+  vadThreshold: 0.015
+  vadUpdateInterval: 0.1
 --- !u!4 &544295186 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1386636691789602320, guid: cd4195b114f03394ba11acf53729517c, type: 3}
@@ -887,6 +900,12 @@ MonoBehaviour:
   profileAsset: {fileID: 11400000, guid: 6ed7d9ed8597c1d4e9dd14303be96fa1, type: 2}
   piperManager: {fileID: 778233026}
   animator: {fileID: 1913966190}
+  eyeContactIK: {fileID: 707502117}
+  faceMesh: {fileID: 80285965}
+  smileBlendshapes:
+  - Mouth_Smile_L
+  - Mouth_Smile_R
+  smileIntensity: 60
 --- !u!1 &642802541
 GameObject:
   m_ObjectHideFlags: 0
@@ -1331,6 +1350,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   target: {fileID: 1408642648}
+  coAgentTarget: {fileID: 312620077}
   overallWeight: 1
   bodyWeight: 0.05
   headWeight: 0.6
@@ -1383,7 +1403,7 @@ GameObject:
   - component: {fileID: 778233027}
   - component: {fileID: 778233026}
   m_Layer: 0
-  m_Name: PiperManager
+  m_Name: PiperManagerMedvin
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1404,7 +1424,7 @@ MonoBehaviour:
   backend: 256
   modelAsset: {fileID: 5022602860645237092, guid: 84222fca50b7587438513368e0426707, type: 3}
   voice: en-us
-  sampleRate: 22050
+  sampleRate: 16000
 --- !u!4 &778233027
 Transform:
   m_ObjectHideFlags: 0
@@ -1412,6 +1432,54 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 778233025}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.52456, y: 1.7814, z: -2.12631}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &785973345
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 785973347}
+  - component: {fileID: 785973346}
+  m_Layer: 0
+  m_Name: PiperManagerMEDINA
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &785973346
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 785973345}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b0030b47ca80ed44b32bdc601eb4b49, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Piper.PiperManager
+  backend: 256
+  modelAsset: {fileID: 5022602860645237092, guid: 5937e9c9d0c058d4589a1158e4fca3e9, type: 3}
+  voice: en-us
+  sampleRate: 16000
+--- !u!4 &785973347
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 785973345}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0.52456, y: 1.7814, z: -2.12631}
@@ -1429,6 +1497,11 @@ Transform:
 CapsuleCollider:
   m_CorrespondingSourceObject: {fileID: 3674628897924422957, guid: cd4195b114f03394ba11acf53729517c, type: 3}
   m_PrefabInstance: {fileID: 1081854095}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &1041432196 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3470134315907055304, guid: 40eb9d5438f3d1a4793ae7749ef4c3ad, type: 3}
+  m_PrefabInstance: {fileID: 1913966189}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &1081854095
 PrefabInstance:
@@ -2801,7 +2874,7 @@ PrefabInstance:
     - target: {fileID: 5787815445450442815, guid: cd4195b114f03394ba11acf53729517c, type: 3}
       propertyPath: m_Controller
       value: 
-      objectReference: {fileID: 9100000, guid: 737a72930d375ea4b890572bedcadf5d, type: 2}
+      objectReference: {fileID: 22100000, guid: bbd77a2add23b8443a9d2dd7770c1df6, type: 2}
     - target: {fileID: 6574427205015944101, guid: cd4195b114f03394ba11acf53729517c, type: 3}
       propertyPath: 'm_BlendShapeWeights.Array.data[29]'
       value: 0
@@ -3112,7 +3185,7 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 482553315421983301, guid: cd4195b114f03394ba11acf53729517c, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1791838157}
-    - targetCorrespondingSourceObject: {fileID: 482553315421983301, guid: cd4195b114f03394ba11acf53729517c, type: 3}
+    - targetCorrespondingSourceObject: {fileID: 3308767243497388623, guid: cd4195b114f03394ba11acf53729517c, type: 3}
       insertIndex: -1
       addedObject: {fileID: 312620077}
     m_AddedComponents:
@@ -3311,7 +3384,7 @@ Light:
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1, g: 0.95686275, b: 0.8392157, a: 1}
-  m_Intensity: 100000
+  m_Intensity: 1
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -3610,7 +3683,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6b88e632ef755d4d8a887f234fee276, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LlmManager
-  serverUrl: ws://172.20.10.6:3001
+  serverUrl: ws://localhost:3001
   useElevenLabsAudio: 0
   elevenLabsAudioSource: {fileID: 0}
 --- !u!4 &1360984289 stripped
@@ -3738,9 +3811,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e338bdfbdad4e2a479dad1df1687fdb2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NpcAgent
-  profileAsset: {fileID: 11400000, guid: 6ed7d9ed8597c1d4e9dd14303be96fa1, type: 2}
-  piperManager: {fileID: 778233026}
-  animator: {fileID: 0}
+  profileAsset: {fileID: 11400000, guid: 07b0805f1855b5e40b2ae64350ecea5d, type: 2}
+  piperManager: {fileID: 785973346}
+  animator: {fileID: 450643428}
+  eyeContactIK: {fileID: 450643426}
+  faceMesh: {fileID: 1623809807}
+  smileBlendshapes:
+  - Mouth_Smile_L
+  - Mouth_Smile_R
+  smileIntensity: 60
 --- !u!4 &1798215193 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5885010424690969237, guid: cd4195b114f03394ba11acf53729517c, type: 3}
@@ -4645,7 +4724,7 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1977398194211804866, guid: 40eb9d5438f3d1a4793ae7749ef4c3ad, type: 3}
       insertIndex: -1
       addedObject: {fileID: 631580302}
-    - targetCorrespondingSourceObject: {fileID: 1977398194211804866, guid: 40eb9d5438f3d1a4793ae7749ef4c3ad, type: 3}
+    - targetCorrespondingSourceObject: {fileID: 3470134315907055304, guid: 40eb9d5438f3d1a4793ae7749ef4c3ad, type: 3}
       insertIndex: -1
       addedObject: {fileID: 363116606}
     m_AddedComponents:
@@ -4697,7 +4776,7 @@ Light:
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1, g: 0.95686275, b: 0.8392157, a: 1}
-  m_Intensity: 100000
+  m_Intensity: 1
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -4956,9 +5035,10 @@ SceneRoots:
   - {fileID: 1146052332}
   - {fileID: 492102561}
   - {fileID: 1354645185}
-  - {fileID: 1081854095}
   - {fileID: 1913966189}
+  - {fileID: 1081854095}
   - {fileID: 642802542}
   - {fileID: 778233027}
+  - {fileID: 785973347}
   - {fileID: 695983744}
   - {fileID: 1108706901}

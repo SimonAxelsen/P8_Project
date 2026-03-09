@@ -15,7 +15,11 @@ set BUN="%USERPROFILE%\.bun\bin\bun.exe"
 echo Installing/Verifying dependencies...
 %BUN% install
 
-:: 3. Run the app
+:: 3. Rebuild the Ollama Brain
+echo Updating Ollama model from modelfiles\Modelfile.interviewer...
+ollama create hr_interviewer -f modelfiles\Modelfile.interviewer
+
+:: 4. Run the app
 echo Starting the project...
 %BUN% run index.ts
 

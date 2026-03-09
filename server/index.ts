@@ -108,6 +108,47 @@ function shouldTriggerBc(st: BcState, msg: BcFeaturesMsg): BcTriggerMsg | null {
 
   return { type: "bc_trigger", npc, action };
 }
+
+// ── LLM Response Parser ─────────────────────────────────────────
+function parseLlmResponse(rawText: string) {
+  // 1. Extract the [STATE] JSON block
+  let state = null;
+  const stateRegex = /\[STATE\](.*?)\[\/STATE\]/s;
+  const stateMatch = rawText.match(stateRegex);
+  
+  if (stateMatch && stateMatch[1]) {
+    try {
+      state = JSON.parse(stateMatch[1]);
+    } catch (e) {
+      console.error("Failed to parse STATE block JSON:", e);
+    }
+  }
+
+  // Remove the [STATE] block from the text
+  let textWithoutState = rawText.replace(stateRegex, "").trim();
+
+  // 2. Extract the inline animation tags (e.g., [nod_backchannel])
+  const tagRegex = /\[([a-z_]+)\]/g;
+  const tags: string[] = [];
+  let match;
+  while ((match = tagRegex.exec(textWithoutState)) !== null) {
+    // FIX: Added safety check for TypeScript
+    if (match[1]) { 
+      tags.push(match[1]); // Pushes just the tag name without brackets
+    }
+  }
+
+  // 3. Create a clean string for the TTS engine by removing all tags
+  const ttsCleanText = textWithoutState.replace(tagRegex, "").trim();
+
+  return {
+    state,              // Parsed JSON object for Unity
+    rawText,            // Original text just in case
+    textWithTags: textWithoutState, // Text with inline tags (useful if Unity parses them for audio sync)
+    ttsCleanText,       // Tag-free text for ElevenLabs/Piper
+    tags                // Array of triggered animations
+  };
+}
 // ── WebSocket server ────────────────────────────────────────────
 
 serve({
@@ -148,22 +189,35 @@ serve({
             }
 
         if (msg.type === "llm") {
-          // NPC profile gets prepended to prompt so Modelfile SYSTEM (META contract) stays intact
           const npcContext = msg.system_prompt ? `[NPC Profile: ${msg.system_prompt}]\n\n` : "";
           const fullPrompt = npcContext + msg.prompt;
           console.log(`[llm] npc=${msg.npc ?? "?"}  model=${msg.model}  prompt=${fullPrompt.substring(0, 120)}…`);
           log({ role: "user", npc: msg.npc, prompt: fullPrompt });
-          const response = await queryOllama({
+          
+          const rawResponse = await queryOllama({
             model: msg.model,
             prompt: fullPrompt,
             options: msg.options,
           });
-          log({ role: "assistant", npc: msg.npc, response });
-          ws.send(JSON.stringify({ type: "llm", npc: msg.npc ?? "", response }));
+          
+          log({ role: "assistant", npc: msg.npc, response: rawResponse });
 
-          // Optional: ElevenLabs TTS — one-line toggle via ENABLE_ELEVENLABS above.
+          // --- NEW PARSING LOGIC ---
+          const parsed = parseLlmResponse(rawResponse);
+
+          // Send structured data to Unity (State + Tags + Text)
+          ws.send(JSON.stringify({ 
+            type: "llm_parsed", 
+            npc: msg.npc ?? "", 
+            state: parsed.state,
+            tags: parsed.tags,
+            textForSubtitles: parsed.textWithTags, 
+            response: rawResponse // Keep for backward compatibility if needed
+          }));
+
+          // Send ONLY the clean text to ElevenLabs/Piper
           if (ENABLE_ELEVENLABS) {
-            await sendElevenLabsTts(ws, msg, response);
+            await sendElevenLabsTts(ws, msg, parsed.ttsCleanText);
           }
         } else {
           // Passthrough / echo for other message types

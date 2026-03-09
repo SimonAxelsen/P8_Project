@@ -1,33 +1,48 @@
 using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Piper;
 
-/// <summary>
-/// Attach to each NPC GameObject. Holds its own profile, audio, and talks to the shared LlmService.
-/// Parses [META] non-verbal actions from LLM output and fires animator triggers.
-/// </summary>
 public class NpcAgent : MonoBehaviour
 {
     public NPCProfileAsset profileAsset;
     public PiperManager piperManager;
     public Animator animator;
+    public EyeContactIK eyeContactIK;
+
+    [Header("Facial Blendshapes")]
+    public SkinnedMeshRenderer faceMesh;
+    [Tooltip("Type the exact names of the Reallusion smile blendshapes here (e.g., Mouth_Smile_L, Mouth_Smile_R)")]
+    public string[] smileBlendshapes = new string[] { "Mouth_Smile_L", "Mouth_Smile_R" };
+    [Tooltip("Reallusion blendshapes usually go from 0 to 100")]
+    public float smileIntensity = 60f;
 
     [HideInInspector] public NPCProfile Profile => profileAsset != null ? profileAsset.profile : null;
 
     public System.Action<string> OnResponseReceived;
-    public System.Action<NpcAction> OnActionReceived;
 
     private AudioSource audioSource;
     private LlmService llm;
+
+    private struct TimedTag
+    {
+        public string triggerName;
+        public float relativePosition;
+    }
 
     void Start()
     {
         llm = FindObjectOfType<LlmService>();
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
-        if (animator == null)    animator = GetComponentInChildren<Animator>();
+        if (animator == null) animator = GetComponentInChildren<Animator>();
+        if (eyeContactIK == null) eyeContactIK = GetComponent<EyeContactIK>();
+
+        // NEW: Subscribe to the real-time backchannel events from the server!
+        if (llm != null) llm.OnBackchannel += HandleRealTimeBackchannel;
     }
 
-    /// <summary>Send a user message to this agent's LLM personality.</summary>
     public void Say(string userText)
     {
         if (Profile == null) { Debug.LogWarning($"{name}: No NPC profile assigned!"); return; }
@@ -36,35 +51,181 @@ public class NpcAgent : MonoBehaviour
 
     void OnLlmResponse(string raw)
     {
-        // RAW output (Ollama modelfile + NPC profile) — META tags visible for dev
         Debug.Log($"<color=yellow>[{Profile.npcName} RAW]</color> {raw}");
 
-        var (action, dialogue) = NpcAction.Parse(raw);
+        string textWithoutState = Regex.Replace(raw, @"\[STATE\].*?\[/STATE\]", "").Trim();
+        List<TimedTag> timedTags = new List<TimedTag>();
+        string cleanDialogue = textWithoutState;
 
-        // Clean dialogue (META stripped) — this is what TTS will speak
-        Debug.Log($"<color=cyan>[{Profile.npcName} TTS]</color> {dialogue}");
+        Regex tagRegex = new Regex(@"\[([a-z_]+)\]");
+        MatchCollection matches = tagRegex.Matches(textWithoutState);
 
-        ApplyAction(action);
-        OnActionReceived?.Invoke(action);
-        OnResponseReceived?.Invoke(dialogue);
+        int removedCharacters = 0;
 
-        // When LlmService is using ElevenLabs, it plays server audio; skip local Piper to avoid double playback.
-        if (llm != null && llm.useElevenLabsAudio)
-            return;
-        if (piperManager != null)
-            Speak(dialogue);
+        foreach (Match match in matches)
+        {
+            string tagName = match.Groups[1].Value;
+            int cleanIndex = match.Index - removedCharacters;
+            timedTags.Add(new TimedTag { triggerName = tagName, relativePosition = cleanIndex });
+            removedCharacters += match.Length;
+        }
+
+        cleanDialogue = tagRegex.Replace(textWithoutState, "").Trim();
+
+        for (int i = 0; i < timedTags.Count; i++)
+        {
+            var tag = timedTags[i];
+            tag.relativePosition = Mathf.Clamp01(tag.relativePosition / (float)Mathf.Max(1, cleanDialogue.Length));
+            timedTags[i] = tag;
+        }
+
+        Debug.Log($"<color=cyan>[{Profile.npcName} TTS]</color> {cleanDialogue}");
+        OnResponseReceived?.Invoke(cleanDialogue);
+
+        GenerateAndPlay(cleanDialogue, timedTags);
     }
 
-    void ApplyAction(NpcAction action)
+    async void GenerateAndPlay(string cleanText, List<TimedTag> timedTags)
     {
-        if (animator == null || string.IsNullOrEmpty(action.animatorTrigger)) return;
-        try { animator.SetTrigger(action.animatorTrigger); }
-        catch { Debug.LogWarning($"{name}: Animator has no trigger '{action.animatorTrigger}'"); }
+        AudioClip clip = null;
+
+        if (llm != null && !llm.useElevenLabsAudio && piperManager != null)
+        {
+            clip = await piperManager.TextToSpeech(cleanText);
+            if (clip != null)
+            {
+                audioSource.clip = clip;
+                audioSource.Play();
+            }
+        }
+        else if (audioSource.clip != null)
+        {
+            clip = audioSource.clip;
+        }
+
+        float duration = clip != null ? clip.length : 3.0f;
+        StartCoroutine(PlayAnimationTimeline(timedTags, duration));
     }
 
-    async void Speak(string text)
+    IEnumerator PlayAnimationTimeline(List<TimedTag> tags, float audioDuration)
     {
-        var clip = await piperManager.TextToSpeech(text);
-        if (clip != null) { audioSource.clip = clip; audioSource.Play(); }
+        float timer = 0f;
+        int currentTagIndex = 0;
+
+        while (timer < audioDuration && currentTagIndex < tags.Count)
+        {
+            timer += Time.deltaTime;
+            float currentProgress = timer / audioDuration;
+
+            if (currentProgress >= tags[currentTagIndex].relativePosition)
+            {
+                string triggerToFire = tags[currentTagIndex].triggerName;
+                HandleActionTag(triggerToFire);
+                currentTagIndex++;
+            }
+            yield return null;
+        }
+    }
+
+    private void HandleActionTag(string tag)
+    {
+        switch (tag)
+        {
+            case "nod_backchannel":
+                if (eyeContactIK != null) eyeContactIK.TriggerProceduralNod(1.2f);
+                break;
+
+            case "gaze_aversion":
+                // Trigger the smooth procedural look-away.
+                if (eyeContactIK != null) eyeContactIK.TriggerProceduralGazeAversion(2.5f);
+                break;
+
+            case "smile_polite":
+                // Trigger the smooth blendshape coroutine!
+                if (faceMesh != null) StartCoroutine(SmileRoutine(2.0f));
+                break;
+
+            default:
+                FireAnimatorTrigger(tag);
+                break;
+        }
+    }
+
+    // --- NEW: Real-time Listener Logic ---
+    private void HandleRealTimeBackchannel(string targetNpc, string action)
+    {
+        // FIX: Use .Contains() so "HR" successfully matches "HR Interviewer"
+        if (Profile == null || !Profile.npcName.Contains(targetNpc)) return;
+
+        Debug.Log($"<color=magenta>[Real-Time Backchannel]</color> {Profile.npcName} doing {action}");
+
+        if (action == "NodSmall" || action == "nod_backchannel")
+        {
+            if (eyeContactIK != null) eyeContactIK.TriggerProceduralNod(1.2f);
+        }
+    }
+
+    private void FireAnimatorTrigger(string triggerName)
+    {
+        if (animator != null)
+        {
+            try { animator.SetTrigger(triggerName); }
+            catch { Debug.LogWarning($"{name}: Animator missing trigger '{triggerName}'"); }
+        }
+    }
+
+    private IEnumerator TemporarilyDisableIK(float duration)
+    {
+        eyeContactIK.SmoothTransitionWeight(0f, 0.2f);
+        yield return new WaitForSeconds(duration);
+        eyeContactIK.SmoothTransitionWeight(1f, 0.5f);
+    }
+
+    // --- NEW REALLUSION SMILE LOGIC ---
+    private IEnumerator SmileRoutine(float holdTime)
+    {
+        float t = 0;
+        float transitionSpeed = 0.35f; // How fast the smile forms
+
+        // 1. Find the exact indices for the blendshapes on the mesh
+        List<int> validIndices = new List<int>();
+        foreach (string shapeName in smileBlendshapes)
+        {
+            int idx = faceMesh.sharedMesh.GetBlendShapeIndex(shapeName);
+            if (idx != -1) validIndices.Add(idx);
+            else Debug.LogWarning($"Blendshape '{shapeName}' not found on {faceMesh.name}");
+        }
+
+        if (validIndices.Count == 0) yield break;
+
+        // 2. Lerp Up (Form the smile)
+        while (t < transitionSpeed)
+        {
+            t += Time.deltaTime;
+            float currentWeight = Mathf.Lerp(0, smileIntensity, t / transitionSpeed);
+            foreach (int idx in validIndices) faceMesh.SetBlendShapeWeight(idx, currentWeight);
+            yield return null;
+        }
+
+        // 3. Hold the smile
+        yield return new WaitForSeconds(holdTime);
+
+        // 4. Lerp Down (Relax the face)
+        t = 0;
+        while (t < transitionSpeed)
+        {
+            t += Time.deltaTime;
+            float currentWeight = Mathf.Lerp(smileIntensity, 0, t / transitionSpeed);
+            foreach (int idx in validIndices) faceMesh.SetBlendShapeWeight(idx, currentWeight);
+            yield return null;
+        }
+
+        // 5. Ensure it is perfectly zeroed out
+        foreach (int idx in validIndices) faceMesh.SetBlendShapeWeight(idx, 0);
+    }
+
+    void OnDestroy()
+    {
+        if (llm != null) llm.OnBackchannel -= HandleRealTimeBackchannel;
     }
 }

@@ -82,18 +82,21 @@ public class LlmService : MonoBehaviour
     if (baseMsg == null || string.IsNullOrEmpty(baseMsg.type))
         return;
 
-    if (baseMsg.type == "llm")
-    {
-        var msg = JsonUtility.FromJson<RelayResponse>(raw);
-        if (pending.TryGetValue(msg.npc, out var cb))
+        // checks for both standard and parsed LLM responses
+        if (baseMsg.type == "llm" || baseMsg.type == "llm_parsed")
         {
-            pending.Remove(msg.npc);
-            cb?.Invoke(msg.response);
-        }
-        return;
-    }
+            var msg = JsonUtility.FromJson<RelayResponse>(raw);
 
-    if (baseMsg.type == "bc_trigger")
+            if (pending.TryGetValue(msg.npc, out var cb))
+            {
+                pending.Remove(msg.npc);
+                // This sends the raw string (with inline tags) to NpcAgent.cs to calculate the timeline!
+                cb?.Invoke(msg.response);
+            }
+            return;
+        }
+
+        if (baseMsg.type == "bc_trigger")
     {
         var bc = JsonUtility.FromJson<BcTriggerMsg>(raw);
         OnBackchannel?.Invoke(bc.npc, bc.action);
