@@ -5,7 +5,7 @@ using Whisper;
 public class VoiceTest : MonoBehaviour
 {
     public WhisperManager whisperManager;
-    private LlmService llm; // NEW: Reference to the LLM service to send VAD data
+    private LlmService llm; //Sends VAD Data
 
     [Header("Input")]
     [Tooltip("Drag the XRI Right Interaction -> Activate action here")]
@@ -29,14 +29,14 @@ public class VoiceTest : MonoBehaviour
     private float _timeSinceLastVadSend = 0f;
     private float _currentSpeechMs = 0f;
     private float _currentPauseMs = 0f;
-    private int _isCurrentlySpeaking = 0; // 0 = no, 1 = yes
+    private int _isCurrentlySpeaking = 0; // BINARY, 0 = no, 1 = yes
 
     private int turnIndex = 0;
 
     void Start()
     {
         if (whisperManager == null) whisperManager = GetComponent<WhisperManager>();
-        llm = FindObjectOfType<LlmService>(); // Grab the LLM service
+        llm = FindObjectOfType<LlmService>();
 
         if (Microphone.devices.Length > 0) _micDevice = Microphone.devices[0];
         else Debug.LogError("No Microphone detected!");
@@ -59,19 +59,19 @@ public class VoiceTest : MonoBehaviour
             else StartRecording();
         }
 
-        // NEW: If we are actively recording, run the VAD loop!
+        // VAD Loop in session when mic is running
         if (Microphone.IsRecording(_micDevice))
         {
             ProcessVAD();
         }
     }
 
-    // --- NEW: Real-Time Audio Analysis ---
+    // ---Real-Time Audio Analysis ---
     void ProcessVAD()
     {
         int pos = Microphone.GetPosition(_micDevice);
 
-        // We need at least a small chunk of audio (256 samples) to analyze
+        // Analysis of small chunk of audio (256 samples) to analyze
         if (pos > 256 && _clip != null)
         {
             float[] samples = new float[256];
@@ -94,7 +94,7 @@ public class VoiceTest : MonoBehaviour
             else
             {
                 _currentPauseMs += Time.deltaTime * 1000f;
-                // If they pause for more than 1.5 seconds, we consider the speaking "turn" completely over
+                // If they pause for more than 1.5 seconds, we consider the speaking turn OVER  
                 if (_currentPauseMs > 1500f) _isCurrentlySpeaking = 0;
             }
 
@@ -107,12 +107,12 @@ public class VoiceTest : MonoBehaviour
                     vad = _isCurrentlySpeaking,
                     pauseMs = _currentPauseMs,
                     speechMs = _currentSpeechMs,
-                    addressee = "UNKNOWN", // We hardcode it to target the HR agent for now
+                    addressee = "UNKNOWN", // UKNOWN let's both agent do the backchanneling.
                     agentsSpeaking = new AgentsSpeaking { HR = false, TECH = false } // Assume agents aren't talking over you
                 };
 
                 llm.SendBackchannelFeatures(bc);
-                _timeSinceLastVadSend = 0f; // Reset network timer
+                _timeSinceLastVadSend = 0f; // And then we reset the network timer for some reason
             }
         }
     }
@@ -143,7 +143,7 @@ public class VoiceTest : MonoBehaviour
         _currentPauseMs = 0f;
         _isCurrentlySpeaking = 0;
 
-        _clip = Microphone.Start(_micDevice, false, 300, 16000); // 5 minute max!
+        _clip = Microphone.Start(_micDevice, false, 300, 16000); // Record for 300 seconds (5 minutes)
     }
 
     async void StopAndTranscribe()
@@ -183,13 +183,13 @@ public class VoiceTest : MonoBehaviour
         var agents = FindObjectsOfType<NpcAgent>();
         if (agents.Length == 0) return;
 
-        // Hacky Turn-Taking: Pick one agent based on whose turn it is
+        // Hacky Turn-Taking.
         NpcAgent activeAgent = agents[turnIndex % agents.Length];
 
         Debug.Log($"<color=orange>[Routing to]</color> {activeAgent.Profile.npcName}");
         activeAgent.Say(text);
 
-        // Advance the turn index for next time you speak
+        // Increase turn everytime you speak
         turnIndex++;
     }
 }

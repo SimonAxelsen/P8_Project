@@ -22,8 +22,8 @@ public class EyeContactIK : MonoBehaviour
     private Coroutine weightCoroutine;
     private Vector3 targetOffset = Vector3.zero;
 
-    // NEW: 0 means look at User, 1 means look at Co-Agent
-    private float gazeBlend = 0f;
+    // 0 means look at User, 1 means look at Co-Agent
+    public float gazeBlend = 0f;
 
     void Start()
     {
@@ -74,7 +74,7 @@ public class EyeContactIK : MonoBehaviour
         currentWeight = targetW;
     }
 
-    // --- NEW PROCEDURAL NOD LOGIC ---
+    // ---PROCEDURAL NOD LOGIC ---
     public void TriggerProceduralNod(float duration = 1.0f)
     {
         StartCoroutine(NodRoutine(duration));
@@ -83,17 +83,17 @@ public class EyeContactIK : MonoBehaviour
     private IEnumerator NodRoutine(float duration)
     {
         float time = 0;
-        // This simulates a "down, center, up, center" motion using a sine wave
+        // sine wave to simulate the nod makes the animation procedural and not dependent on 
         while (time < duration)
         {
-            // The 0.15f is the intensity of the nod. Increase it for a bigger nod!
+            // Nod intensity
             float yOffset = Mathf.Sin((time / duration) * Mathf.PI * 2) * -0.15f;
             targetOffset = new Vector3(0, yOffset, 0);
 
             time += Time.deltaTime;
             yield return null;
         }
-        targetOffset = Vector3.zero; // Reset perfectly
+        targetOffset = Vector3.zero; // Resets
     }
 
     public void TriggerProceduralGazeAversion(float duration = 2.5f)
@@ -103,13 +103,13 @@ public class EyeContactIK : MonoBehaviour
 
     private IEnumerator GazeAversionRoutine(float duration)
     {
-        // 1. Slowed down the transition from 0.4s to 1.2s for a natural turn
+        // Turn Speed
         float transitionTime = 0.7f;
 
         float t = 0;
         while (t < transitionTime)
         {
-            // 2. Added SmoothStep for natural acceleration/deceleration
+            // Acceleration
             float easedTime = Mathf.SmoothStep(0f, 1f, t / transitionTime);
             gazeBlend = Mathf.Lerp(0f, 1f, easedTime);
             t += Time.deltaTime;

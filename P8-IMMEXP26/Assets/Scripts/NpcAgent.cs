@@ -39,7 +39,7 @@ public class NpcAgent : MonoBehaviour
         if (animator == null) animator = GetComponentInChildren<Animator>();
         if (eyeContactIK == null) eyeContactIK = GetComponent<EyeContactIK>();
 
-        // NEW: Subscribe to the real-time backchannel events from the server!
+        // Here we subscribe to the real-time backchannel events from the server!
         if (llm != null) llm.OnBackchannel += HandleRealTimeBackchannel;
     }
 
@@ -136,12 +136,10 @@ public class NpcAgent : MonoBehaviour
                 break;
 
             case "gaze_aversion":
-                // Trigger the smooth procedural look-away.
                 if (eyeContactIK != null) eyeContactIK.TriggerProceduralGazeAversion(2.5f);
                 break;
 
             case "smile_polite":
-                // Trigger the smooth blendshape coroutine!
                 if (faceMesh != null) StartCoroutine(SmileRoutine(2.0f));
                 break;
 
@@ -151,10 +149,10 @@ public class NpcAgent : MonoBehaviour
         }
     }
 
-    // --- NEW: Real-time Listener Logic ---
+    // ---REAL-TIME LISTENER LOGIC---
     private void HandleRealTimeBackchannel(string targetNpc, string action)
     {
-        // FIX: Use .Contains() so "HR" successfully matches "HR Interviewer"
+        // Checks for name (HR, TECH e.g)
         if (Profile == null || !Profile.npcName.Contains(targetNpc)) return;
 
         Debug.Log($"<color=magenta>[Real-Time Backchannel]</color> {Profile.npcName} doing {action}");
@@ -181,7 +179,7 @@ public class NpcAgent : MonoBehaviour
         eyeContactIK.SmoothTransitionWeight(1f, 0.5f);
     }
 
-    // --- NEW REALLUSION SMILE LOGIC ---
+    // --- SMILE LOGIC ---
     private IEnumerator SmileRoutine(float holdTime)
     {
         float t = 0;
@@ -198,7 +196,7 @@ public class NpcAgent : MonoBehaviour
 
         if (validIndices.Count == 0) yield break;
 
-        // 2. Lerp Up (Form the smile)
+        // 2. Lerp Up (Ease In)
         while (t < transitionSpeed)
         {
             t += Time.deltaTime;
@@ -210,7 +208,7 @@ public class NpcAgent : MonoBehaviour
         // 3. Hold the smile
         yield return new WaitForSeconds(holdTime);
 
-        // 4. Lerp Down (Relax the face)
+        // 4. Lerp Down (Ease Out)
         t = 0;
         while (t < transitionSpeed)
         {
@@ -220,7 +218,7 @@ public class NpcAgent : MonoBehaviour
             yield return null;
         }
 
-        // 5. Ensure it is perfectly zeroed out
+        // 5. Ensure it is perfectly zeroed out to zero 0.
         foreach (int idx in validIndices) faceMesh.SetBlendShapeWeight(idx, 0);
     }
 
