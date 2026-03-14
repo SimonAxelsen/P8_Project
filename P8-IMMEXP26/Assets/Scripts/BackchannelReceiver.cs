@@ -9,7 +9,7 @@ public class BackchannelReceiver : MonoBehaviour
 
     void Start()
     {
-        llm = FindObjectOfType<LlmService>();
+        llm = FindFirstObjectByType<LlmService>();
         llm.OnBackchannel += HandleBackchannel;
     }
 
@@ -23,7 +23,7 @@ public class BackchannelReceiver : MonoBehaviour
         var agent = (npc == "HR") ? hrAgent : techAgent;
         if (agent == null || agent.animator == null) return;
 
-        // Minimal safety: don’t do anything if the agent is currently speaking
+        // Minimal safety: donï¿½t do anything if the agent is currently speaking
         // (optional: add a speaking flag to NpcAgent later)
         agent.animator.SetTrigger(action);
     }

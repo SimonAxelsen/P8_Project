@@ -23,7 +23,7 @@ public class LlmService : MonoBehaviour
     public System.Action<string, string> OnBackchannel;
 
     private WebSocket ws;
-    private readonly Dictionary<string, System.Action<string>> pending = new();
+    private readonly Dictionary<string, System.Action<string, bool>> pendingChunks = new();
 
     void Awake()
     {
@@ -53,13 +53,13 @@ public class LlmService : MonoBehaviour
     async void OnApplicationQuit() => await ws?.Close();
 
     /// <summary>Send a prompt to the relay server for a specific NPC.</summary>
-    public void Ask(string userText, NPCProfile profile, System.Action<string> onResponse)
+    public void Ask(string userText, NPCProfile profile, System.Action<string, bool> onChunkedResponse)
     {
         if (ws == null || ws.State != WebSocketState.Open)
         { Debug.LogError("[LlmService] WebSocket not connected"); return; }
 
         string npcKey = profile.npcName;
-        pending[npcKey] = onResponse;
+        pendingChunks[npcKey] = onChunkedResponse;
 
         // Gather phase instructions to structure the interview dynamically
         string phaseContext = "";
@@ -98,16 +98,26 @@ public class LlmService : MonoBehaviour
     if (baseMsg == null || string.IsNullOrEmpty(baseMsg.type))
         return;
 
-        // checks for both standard and parsed LLM responses
+        // streaming chunks from server
+        if (baseMsg.type == "llm_chunk")
+        {
+            var msgChunk = JsonUtility.FromJson<RelayChunkResponse>(raw);
+            if (pendingChunks.TryGetValue(msgChunk.npc, out var cb))
+            {
+                cb?.Invoke(msgChunk.chunk, msgChunk.isFinal);
+                if (msgChunk.isFinal) pendingChunks.Remove(msgChunk.npc);
+            }
+            return;
+        }
+
+        // Keep for backwards compatibility just in case
         if (baseMsg.type == "llm" || baseMsg.type == "llm_parsed")
         {
             var msg = JsonUtility.FromJson<RelayResponse>(raw);
-
-            if (pending.TryGetValue(msg.npc, out var cb))
+            if (pendingChunks.TryGetValue(msg.npc, out var cb))
             {
-                pending.Remove(msg.npc);
-                // This sends the raw string (with inline tags) to NpcAgent.cs to calculate the timeline!
-                cb?.Invoke(msg.response);
+                cb?.Invoke(msg.response, true);
+                pendingChunks.Remove(msg.npc);
             }
             return;
         }
@@ -229,6 +239,15 @@ class RelayResponse
     public string npc;
     public string response;
     public string message; // for error type
+}
+
+[System.Serializable]
+class RelayChunkResponse
+{
+    public string type;
+    public string npc;
+    public string chunk;
+    public bool isFinal;
 }
 
 [System.Serializable]

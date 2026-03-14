@@ -31,9 +31,21 @@ public class NpcAgent : MonoBehaviour
         public float relativePosition;
     }
 
+    private struct AudioClipInfo
+    {
+        public AudioClip clip;
+        public List<TimedTag> tags;
+        public string originalText;
+    }
+
+    private Queue<string> chunkQueue = new Queue<string>();
+    private Queue<AudioClipInfo> audioQueue = new Queue<AudioClipInfo>();
+    private bool isGeneratingTts = false;
+    private bool isPlayingAudio = false;
+
     void Start()
     {
-        llm = FindObjectOfType<LlmService>();
+        llm = FindFirstObjectByType<LlmService>();
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
         if (animator == null) animator = GetComponentInChildren<Animator>();
@@ -46,65 +58,110 @@ public class NpcAgent : MonoBehaviour
     public void Say(string userText)
     {
         if (Profile == null) { Debug.LogWarning($"{name}: No NPC profile assigned!"); return; }
-        llm.Ask(userText, Profile, OnLlmResponse);
+        if (llm == null) { Debug.LogWarning($"{name}: No LlmService found in scene!"); return; }
+        llm.Ask(userText, Profile, OnLlmChunk);
     }
 
-    void OnLlmResponse(string raw)
+    void OnLlmChunk(string chunk, bool isFinal)
     {
-        Debug.Log($"<color=yellow>[{Profile.npcName} RAW]</color> {raw}");
+        if (string.IsNullOrWhiteSpace(chunk)) return;
 
-        string textWithoutState = Regex.Replace(raw, @"\[STATE\].*?\[/STATE\]", "").Trim();
-        List<TimedTag> timedTags = new List<TimedTag>();
-        string cleanDialogue = textWithoutState;
+        Debug.Log($"<color=yellow>[{Profile.npcName} CHUNK]</color> {chunk}");
+        chunkQueue.Enqueue(chunk);
 
-        Regex tagRegex = new Regex(@"\[([a-z_]+)\]");
-        MatchCollection matches = tagRegex.Matches(textWithoutState);
-
-        int removedCharacters = 0;
-
-        foreach (Match match in matches)
+        if (!isGeneratingTts)
         {
-            string tagName = match.Groups[1].Value;
-            int cleanIndex = match.Index - removedCharacters;
-            timedTags.Add(new TimedTag { triggerName = tagName, relativePosition = cleanIndex });
-            removedCharacters += match.Length;
+            GenerateTtsLoop();
         }
-
-        cleanDialogue = tagRegex.Replace(textWithoutState, "").Trim();
-
-        for (int i = 0; i < timedTags.Count; i++)
-        {
-            var tag = timedTags[i];
-            tag.relativePosition = Mathf.Clamp01(tag.relativePosition / (float)Mathf.Max(1, cleanDialogue.Length));
-            timedTags[i] = tag;
-        }
-
-        Debug.Log($"<color=cyan>[{Profile.npcName} TTS]</color> {cleanDialogue}");
-        OnResponseReceived?.Invoke(cleanDialogue);
-
-        GenerateAndPlay(cleanDialogue, timedTags);
     }
 
-    async void GenerateAndPlay(string cleanText, List<TimedTag> timedTags)
+    async void GenerateTtsLoop()
     {
-        AudioClip clip = null;
+        isGeneratingTts = true;
 
-        if (llm != null && !llm.useElevenLabsAudio && piperManager != null)
+        while (true)
         {
-            clip = await piperManager.TextToSpeech(cleanText);
+            if (chunkQueue.Count == 0)
+            {
+                isGeneratingTts = false;
+                if (chunkQueue.Count == 0) break;
+                isGeneratingTts = true;
+            }
+
+            string rawChunk = chunkQueue.Dequeue();
+            
+            // Extract tags
+            List<TimedTag> timedTags = new List<TimedTag>();
+            string cleanDialogue = rawChunk;
+
+            Regex tagRegex = new Regex(@"\[([a-z_]+)\]");
+            MatchCollection matches = tagRegex.Matches(rawChunk);
+
+            int removedCharacters = 0;
+            foreach (Match match in matches)
+            {
+                string tagName = match.Groups[1].Value;
+                int cleanIndex = match.Index - removedCharacters;
+                timedTags.Add(new TimedTag { triggerName = tagName, relativePosition = cleanIndex });
+                removedCharacters += match.Length;
+            }
+
+            cleanDialogue = tagRegex.Replace(rawChunk, "").Trim();
+
+            for (int i = 0; i < timedTags.Count; i++)
+            {
+                var tag = timedTags[i];
+                tag.relativePosition = Mathf.Clamp01(tag.relativePosition / (float)Mathf.Max(1, cleanDialogue.Length));
+                timedTags[i] = tag;
+            }
+
+            AudioClip clip = null;
+            if (llm != null && !llm.useElevenLabsAudio && piperManager != null && !string.IsNullOrEmpty(cleanDialogue))
+            {
+                clip = await piperManager.TextToSpeech(cleanDialogue);
+            }
+            
             if (clip != null)
             {
-                audioSource.clip = clip;
-                audioSource.Play();
+                audioQueue.Enqueue(new AudioClipInfo { clip = clip, tags = timedTags, originalText = cleanDialogue });
+                
+                if (!isPlayingAudio)
+                {
+                    StartCoroutine(PlayAudioLoop());
+                }
             }
         }
-        else if (audioSource.clip != null)
-        {
-            clip = audioSource.clip;
-        }
 
-        float duration = clip != null ? clip.length : 3.0f;
-        StartCoroutine(PlayAnimationTimeline(timedTags, duration));
+        isGeneratingTts = false;
+    }
+
+    IEnumerator PlayAudioLoop()
+    {
+        isPlayingAudio = true;
+
+        while (true)
+        {
+            if (audioQueue.Count == 0)
+            {
+                isPlayingAudio = false;
+                if (audioQueue.Count == 0) yield break;
+                isPlayingAudio = true;
+            }
+
+            var info = audioQueue.Dequeue();
+            
+            Debug.Log($"<color=cyan>[{Profile.npcName} TTS]</color> {info.originalText}");
+            OnResponseReceived?.Invoke(info.originalText);
+
+            audioSource.clip = info.clip;
+            audioSource.Play();
+
+            // Run timeline for this specific chunk
+            StartCoroutine(PlayAnimationTimeline(info.tags, info.clip.length));
+
+            // Wait for clip to finish before playing next
+            yield return new WaitForSeconds(info.clip.length);
+        }
     }
 
     IEnumerator PlayAnimationTimeline(List<TimedTag> tags, float audioDuration)

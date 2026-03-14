@@ -36,7 +36,7 @@ public class VoiceTest : MonoBehaviour
     void Start()
     {
         if (whisperManager == null) whisperManager = GetComponent<WhisperManager>();
-        llm = FindObjectOfType<LlmService>();
+        llm = FindFirstObjectByType<LlmService>();
 
         if (Microphone.devices.Length > 0) _micDevice = Microphone.devices[0];
         else Debug.LogError("No Microphone detected!");
@@ -180,7 +180,7 @@ public class VoiceTest : MonoBehaviour
         Debug.Log($"<color=white>[Broadcast]</color> {text}");
 
         // Find all agents in the scene
-        var agents = FindObjectsOfType<NpcAgent>();
+        var agents = FindObjectsByType<NpcAgent>(FindObjectsSortMode.None);
         if (agents.Length == 0) return;
 
         // Hacky Turn-Taking.

@@ -32,7 +32,7 @@ public class BackchannelFeatureSender : MonoBehaviour
 
     void Start()
     {
-        if (llm == null) llm = FindObjectOfType<LlmService>();
+        if (llm == null) llm = FindFirstObjectByType<LlmService>();
         int frameSamples = Mathf.CeilToInt(sampleRate * (frameMs / 1000f));
         frameBuf = new float[frameSamples];
 
