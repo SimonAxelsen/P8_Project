@@ -61,14 +61,30 @@ public class LlmService : MonoBehaviour
         string npcKey = profile.npcName;
         pending[npcKey] = onResponse;
 
+        // Gather phase instructions to structure the interview dynamically
+        string phaseContext = "";
+        if (InterviewManager.Instance != null)
+        {
+            phaseContext =  "\n" + InterviewManager.Instance.GetPhaseContext();
+        }
+
         var msg = new RelayRequest
         {
             type = "llm",
             npc = npcKey,
             model = profile.modelName,
-            system_prompt = profile.GetSystemPrompt(),
+            system_prompt = profile.GetSystemPrompt() + phaseContext,
             prompt = userText,
-            options = new LlmOptions { temperature = profile.temperature, repeat_penalty = profile.repeatPenalty }
+            options = new LlmOptions 
+            { 
+                temperature = profile.temperature, 
+                repeat_penalty = profile.repeatPenalty,
+                // OPTIMIZATION: Limits context window and predict tokens for significantly faster generation!
+                num_ctx = 1024,
+                num_predict = 150,
+                // OPTIMIZATION: Limits LLM CPU threads to avoid starving Unity of CPU resources
+                num_thread = 4 
+            }
         };
 
         ws.SendText(JsonUtility.ToJson(msg));
@@ -200,6 +216,10 @@ class LlmOptions
 {
     public float temperature;
     public float repeat_penalty;
+    // OPTIMIZATION fields for Ollama to drastically reduce load and TTFT
+    public int num_ctx;
+    public int num_predict;
+    public int num_thread;
 }
 
 [System.Serializable]
