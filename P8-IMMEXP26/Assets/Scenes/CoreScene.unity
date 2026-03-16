@@ -959,6 +959,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Office - V1
       objectReference: {fileID: 0}
+    - target: {fileID: 4037588234156073481, guid: 50f497b9973470b45acaaf628809f91c, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5684799811060692257, guid: 50f497b9973470b45acaaf628809f91c, type: 3}
       propertyPath: m_LocalPosition.y
       value: 2.1806583
