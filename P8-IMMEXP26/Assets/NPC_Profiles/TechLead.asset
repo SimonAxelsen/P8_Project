@@ -13,15 +13,11 @@ MonoBehaviour:
   m_Name: TechLead
   m_EditorClassIdentifier: Assembly-CSharp::NPCProfileAsset
   profile:
-    npcName: TECH Interviewer
+    npcName: TECH
     modelName: hr_interviewer
-    systemPrompt: You conduct behavioral interviews. You assess cultural fit, communication,
-      and soft skills.
-    contextPrompt: You're interviewing a candidate for an entry-level position. Your
-      colleague handles "human resources" related questions. You go first to ease
-      the candidate in
-    personalityTraits: Strict, encouraging, builds rapport. Gives verbal cushions
-      before tough questions
+    systemPrompt: 
+    contextPrompt: 
+    personalityTraits: 
     voiceModelName: en_GB-southern_english_female-low
     temperature: 0.7
-    repeatPenalty: 1.1
+    repeatPenalty: 1

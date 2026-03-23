@@ -13,14 +13,11 @@ MonoBehaviour:
   m_Name: TestDummy_2
   m_EditorClassIdentifier: Assembly-CSharp::NPCProfileAsset
   profile:
-    npcName: HR Interviewer
+    npcName: HR
     modelName: hr_interviewer
-    systemPrompt: You conduct behavioral interviews. You assess cultural fit, communication,
-      and soft skills.
-    contextPrompt: You're interviewing a candidate for an entry-level position. Your
-      colleague handles technical questions. You go first to ease the candidate in.
-    personalityTraits: Warm, encouraging, builds rapport. Gives verbal cushions before
-      tough questions
+    systemPrompt: 
+    contextPrompt: 
+    personalityTraits: 
     voiceModelName: en_US-lessac-medium
     temperature: 0.7
-    repeatPenalty: 1.1
+    repeatPenalty: 1

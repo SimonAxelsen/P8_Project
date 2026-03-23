@@ -49,7 +49,7 @@ public class NpcAgent : MonoBehaviour
         llm.Ask(userText, Profile, OnLlmResponse);
     }
 
-    void OnLlmResponse(string raw)
+    public void OnLlmResponse(string raw)
     {
         Debug.Log($"<color=yellow>[{Profile.npcName} RAW]</color> {raw}");
 

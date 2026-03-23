@@ -178,18 +178,7 @@ public class VoiceTest : MonoBehaviour
     void Broadcast(string text)
     {
         Debug.Log($"<color=white>[Broadcast]</color> {text}");
-
-        // Find all agents in the scene
-        var agents = FindObjectsOfType<NpcAgent>();
-        if (agents.Length == 0) return;
-
-        // Hacky Turn-Taking.
-        NpcAgent activeAgent = agents[turnIndex % agents.Length];
-
-        Debug.Log($"<color=orange>[Routing to]</color> {activeAgent.Profile.npcName}");
-        activeAgent.Say(text);
-
-        // Increase turn everytime you speak
-        turnIndex++;
+        // Just send it to the first agent we find. The Bun server will decide who actually speaks!
+        FindObjectOfType<NpcAgent>().Say(text);
     }
 }

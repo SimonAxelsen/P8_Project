@@ -24,6 +24,7 @@ public class LlmService : MonoBehaviour
 
     private WebSocket ws;
     private readonly Dictionary<string, System.Action<string>> pending = new();
+    public static event System.Action<InterviewGameData> OnGameDataUpdated;
 
     void Awake()
     {
@@ -73,17 +74,16 @@ public class LlmService : MonoBehaviour
             type = "llm",
             npc = npcKey,
             model = profile.modelName,
-            system_prompt = profile.GetSystemPrompt() + phaseContext,
+            // FIX: Remove the '+ phaseContext'. Let the Modelfile and Server do the thinking!
+            system_prompt = profile.GetSystemPrompt(),
             prompt = userText,
-            options = new LlmOptions 
-            { 
-                temperature = profile.temperature, 
+            options = new LlmOptions
+            {
+                temperature = profile.temperature,
                 repeat_penalty = profile.repeatPenalty,
-                // OPTIMIZATION: Limits context window and predict tokens for significantly faster generation!
-                num_ctx = 1024,
-                num_predict = 150,
-                // OPTIMIZATION: Limits LLM CPU threads to avoid starving Unity of CPU resources
-                num_thread = 4 
+                num_ctx = 4096,
+                num_predict = 250,
+                num_thread = 4
             }
         };
 
@@ -91,23 +91,40 @@ public class LlmService : MonoBehaviour
     }
 
     void OnMessage(byte[] bytes)
-{
+    {
     string raw = Encoding.UTF8.GetString(bytes);
 
     var baseMsg = JsonUtility.FromJson<BaseMsg>(raw);
     if (baseMsg == null || string.IsNullOrEmpty(baseMsg.type))
         return;
 
-        // checks for both standard and parsed LLM responses
         if (baseMsg.type == "llm" || baseMsg.type == "llm_parsed")
         {
-            var msg = JsonUtility.FromJson<RelayResponse>(raw);
+            // Parse the ENTIRE message into our new strict C# class
+            var msg = JsonUtility.FromJson<ParsedLlmMessage>(raw);
 
-            if (pending.TryGetValue(msg.npc, out var cb))
+            // --- THE CLEAN EVENT TRIGGER ---
+            if (msg.gameData != null && msg.gameData.isOutro)
             {
-                pending.Remove(msg.npc);
-                // This sends the raw string (with inline tags) to NpcAgent.cs to calculate the timeline!
-                cb?.Invoke(msg.response);
+                Debug.Log("<color=green>[SYSTEM] The server officially declared the Outro phase.</color>");
+                // Turn on your Exit Text here!
+            }
+
+            // --- FUTURE PROOFING FOR YOUR HP BARS ---
+            if (msg.gameData != null)
+            {
+                // Broadcast the data to any UI scripts that are listening!
+                OnGameDataUpdated?.Invoke(msg.gameData);
+            }
+
+            // --- DIRECT-DELIVERY ROUTING ---
+            NpcAgent[] allAgents = FindObjectsOfType<NpcAgent>();
+            foreach (var agent in allAgents)
+            {
+                if (agent.Profile != null && agent.Profile.npcName == msg.npc)
+                {
+                    agent.OnLlmResponse(msg.response);
+                }
             }
             return;
         }
@@ -250,4 +267,22 @@ class AudioMsg
     public string format;  // "pcm"
     public int sampleRate;
     public string data;    // base64
+}
+
+// Matches JSON and Bun
+[System.Serializable]
+public class InterviewGameData
+{
+    public string[] allCategories;
+    public int[] allScores;
+    public bool isOutro;
+}
+
+[System.Serializable]
+public class ParsedLlmMessage
+{
+    public string type;
+    public string npc;
+    public string response;
+    public InterviewGameData gameData;
 }
