@@ -19,6 +19,13 @@ public class InterviewManager : MonoBehaviour
     [Header("Current State")]
     public InterviewPhase currentPhase = InterviewPhase.Intro;
 
+    [Header("Interview Session")]
+    [Tooltip("Stable identifier for this interview participant. Auto-generated if empty.")]
+    public string participantId = "";
+
+    [Tooltip("Evaluator model sent to Ollama for interview scoring.")]
+    public string evaluatorModel = "qwen2.5:14b";
+
     // Instructions injected into the LLM system prompt based on the current phase
     private readonly Dictionary<InterviewPhase, string> phaseInstructions = new Dictionary<InterviewPhase, string>()
     {
@@ -58,5 +65,36 @@ public class InterviewManager : MonoBehaviour
     {
         currentPhase = newPhase;
         Debug.Log($"[InterviewManager] Transitioned to phase: {newPhase}");
+    }
+
+    public string GetOrCreateParticipantId()
+    {
+        if (string.IsNullOrWhiteSpace(participantId))
+        {
+            participantId = $"participant_{System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+        }
+
+        return participantId;
+    }
+
+    public string BeginNewInterviewSession()
+    {
+        participantId = $"participant_{System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}";
+        currentPhase = InterviewPhase.Intro;
+        return participantId;
+    }
+
+    /// <summary>
+    /// Constructs a message to stop tracking and evaluate the candidate in the backend server.
+    /// You should send this payload via WebSocket when currentPhase transitions out or ends.
+    /// </summary>
+    public string CreateEvaluateMessage(string participantId, string model = "qwen2.5:14b")
+    {
+        return $"{{\"type\": \"evaluate_interview\", \"participantId\": \"{participantId}\", \"model\": \"{model}\"}}";
+    }
+
+    public string CreateEvaluateMessage()
+    {
+        return CreateEvaluateMessage(GetOrCreateParticipantId(), evaluatorModel);
     }
 }

@@ -2,6 +2,7 @@ import { serve, type ServerWebSocket } from "bun";
 import { appendFileSync } from "fs";
 import { join } from "path";
 import { sendElevenLabsTts } from "./elevenlabs";
+import { evaluateInterview } from "./evaluator.ts";
 
 const PORT = 3001;
 const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434/api/generate";
@@ -226,6 +227,39 @@ serve({
             }
              return;
             }
+
+        if (msg.type === "evaluate_interview") {
+          const participantId = (typeof msg.participantId === "string" && msg.participantId.trim().length > 0)
+            ? msg.participantId
+            : undefined;
+
+          console.log(`[llm] Evaluating interview for ${participantId ?? "<latest participant>"}...`);
+          
+          try {
+            const evaluationResponse = await evaluateInterview(
+              participantId, 
+              LOG_FILE, 
+              queryOllama, 
+              msg.model || "qwen2.5:14b"
+            );
+
+            ws.send(JSON.stringify({ 
+              type: "evaluation_result", 
+              participantId: evaluationResponse.participantId,
+              model: evaluationResponse.model,
+              transcriptTurns: evaluationResponse.transcriptTurns,
+              evaluation: evaluationResponse.evaluation,
+              result: evaluationResponse.raw
+            }));
+            
+            log({ type: "evaluation", participantId: evaluationResponse.participantId, model: evaluationResponse.model, evaluation: evaluationResponse.evaluation });
+            
+          } catch (err: any) {
+            console.error("Evaluation Error:", err);
+            ws.send(JSON.stringify({ type: "error", message: "Evaluation failed: " + err.message }));
+          }
+          return;
+        }
 
         if (msg.type === "llm") {
          // 1. INJECT THE INVISIBLE SCORECARD INTO THE PROMPT

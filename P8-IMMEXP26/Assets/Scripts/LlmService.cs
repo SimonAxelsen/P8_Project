@@ -19,8 +19,13 @@ public class LlmService : MonoBehaviour
     [Tooltip("Optional. If unset, uses an AudioSource on this GameObject.")]
     public AudioSource elevenLabsAudioSource;
 
+    [Header("Interview Evaluation")]
+    [Tooltip("Default evaluator model used when requesting interview scoring.")]
+    public string defaultEvaluatorModel = "qwen2.5:14b";
+
     // Backchannel trigger from server.
     public System.Action<string, string> OnBackchannel;
+    public System.Action<InterviewEvaluationEvent> OnEvaluationReceived;
 
     private WebSocket ws;
     private readonly Dictionary<string, System.Action<string>> pending = new();
@@ -53,6 +58,27 @@ public class LlmService : MonoBehaviour
 
     async void OnApplicationQuit() => await ws?.Close();
 
+    public void RequestInterviewEvaluation(string participantId = null, string evaluatorModel = null)
+    {
+        if (ws == null || ws.State != WebSocketState.Open)
+        {
+            Debug.LogWarning("[LlmService] Cannot request evaluation: WebSocket not connected yet.");
+            return;
+        }
+
+        string selectedModel = string.IsNullOrWhiteSpace(evaluatorModel) ? defaultEvaluatorModel : evaluatorModel;
+
+        var msg = new EvaluateInterviewMsg
+        {
+            type = "evaluate_interview",
+            participantId = string.IsNullOrWhiteSpace(participantId) ? null : participantId,
+            model = selectedModel,
+        };
+
+        ws.SendText(JsonUtility.ToJson(msg));
+        Debug.Log($"[LlmService] Evaluation requested with model {selectedModel}");
+    }
+
     /// <summary>Send a prompt to the relay server for a specific NPC.</summary>
     public void Ask(string userText, NPCProfile profile, System.Action<string> onResponse)
     {
@@ -72,6 +98,7 @@ public class LlmService : MonoBehaviour
         var msg = new RelayRequest
         {
             type = "llm",
+            participantId = InterviewManager.Instance != null ? InterviewManager.Instance.GetOrCreateParticipantId() : "unknown",
             npc = npcKey,
             model = profile.modelName,
             // FIX: Remove the '+ phaseContext'. Let the Modelfile and Server do the thinking!
@@ -94,9 +121,9 @@ public class LlmService : MonoBehaviour
     {
     string raw = Encoding.UTF8.GetString(bytes);
 
-    var baseMsg = JsonUtility.FromJson<BaseMsg>(raw);
-    if (baseMsg == null || string.IsNullOrEmpty(baseMsg.type))
-        return;
+        var baseMsg = JsonUtility.FromJson<BaseMsg>(raw);
+        if (baseMsg == null || string.IsNullOrEmpty(baseMsg.type))
+            return;
 
         if (baseMsg.type == "llm" || baseMsg.type == "llm_parsed")
         {
@@ -130,40 +157,66 @@ public class LlmService : MonoBehaviour
         }
 
         if (baseMsg.type == "bc_trigger")
-    {
-        var bc = JsonUtility.FromJson<BcTriggerMsg>(raw);
-        OnBackchannel?.Invoke(bc.npc, bc.action);
-        return;
-    }
-
-    if (baseMsg.type == "error")
-    {
-        var err = JsonUtility.FromJson<RelayResponse>(raw);
-        Debug.LogError($"[Relay] {err.message}");
-        return;
-    }
-
-    if (baseMsg.type == "audio")
-    {
-        var audioMsg = JsonUtility.FromJson<AudioMsg>(raw);
-        if (audioMsg != null && useElevenLabsAudio && elevenLabsAudioSource != null && audioMsg.format == "pcm" && audioMsg.sampleRate > 0 && !string.IsNullOrEmpty(audioMsg.data))
         {
-            AudioClip clip = DecodePcmToClip(audioMsg.data, audioMsg.sampleRate);
-            if (clip != null)
+            var bc = JsonUtility.FromJson<BcTriggerMsg>(raw);
+            if (bc == null || string.IsNullOrWhiteSpace(bc.npc) || string.IsNullOrWhiteSpace(bc.action))
+                return;
+            OnBackchannel?.Invoke(bc.npc, bc.action);
+            return;
+        }
+
+        if (baseMsg.type == "evaluation_result")
+        {
+            var evalMsg = JsonUtility.FromJson<EvaluationResultMsg>(raw);
+
+            if (evalMsg != null && evalMsg.evaluation != null)
             {
-                elevenLabsAudioSource.clip = clip;
-                elevenLabsAudioSource.Play();
-                Debug.Log($"[LlmService] Playing ElevenLabs audio for npc={audioMsg.npc}, length={clip.length:F1}s");
+                var evt = new InterviewEvaluationEvent
+                {
+                    participantId = evalMsg.participantId,
+                    model = evalMsg.model,
+                    transcriptTurns = evalMsg.transcriptTurns,
+                    evaluation = evalMsg.evaluation,
+                    raw = evalMsg.result,
+                };
+                OnEvaluationReceived?.Invoke(evt);
+                Debug.Log($"[LlmService] Evaluation received: participant={evt.participantId}, score={evt.evaluation.score}");
             }
             else
-                Debug.LogWarning("[LlmService] ElevenLabs audio received but PCM decode failed.");
+            {
+                Debug.LogWarning("[LlmService] evaluation_result received but could not parse evaluation payload.");
+            }
+            return;
         }
-        else if (audioMsg != null && !useElevenLabsAudio)
-            Debug.Log("[LlmService] ElevenLabs audio received; enable 'Use ElevenLabs Audio' on LlmService to hear it.");
-        else if (audioMsg != null && useElevenLabsAudio && elevenLabsAudioSource == null)
-            Debug.LogWarning("[LlmService] ElevenLabs audio received but no AudioSource (add one or enable Use ElevenLabs Audio).");
-        return;
-    }
+
+        if (baseMsg.type == "error")
+        {
+            var err = JsonUtility.FromJson<RelayResponse>(raw);
+            Debug.LogError($"[Relay] {err.message}");
+            return;
+        }
+
+        if (baseMsg.type == "audio")
+        {
+            var audioMsg = JsonUtility.FromJson<AudioMsg>(raw);
+            if (audioMsg != null && useElevenLabsAudio && elevenLabsAudioSource != null && audioMsg.format == "pcm" && audioMsg.sampleRate > 0 && !string.IsNullOrEmpty(audioMsg.data))
+            {
+                AudioClip clip = DecodePcmToClip(audioMsg.data, audioMsg.sampleRate);
+                if (clip != null)
+                {
+                    elevenLabsAudioSource.clip = clip;
+                    elevenLabsAudioSource.Play();
+                    Debug.Log($"[LlmService] Playing ElevenLabs audio for npc={audioMsg.npc}, length={clip.length:F1}s");
+                }
+                else
+                    Debug.LogWarning("[LlmService] ElevenLabs audio received but PCM decode failed.");
+            }
+            else if (audioMsg != null && !useElevenLabsAudio)
+                Debug.Log("[LlmService] ElevenLabs audio received; enable 'Use ElevenLabs Audio' on LlmService to hear it.");
+            else if (audioMsg != null && useElevenLabsAudio && elevenLabsAudioSource == null)
+                Debug.LogWarning("[LlmService] ElevenLabs audio received but no AudioSource (add one or enable Use ElevenLabs Audio).");
+            return;
+        }
     }
 
     /// <summary>Decode base64 PCM 16-bit LE to Unity AudioClip (mono).</summary>
@@ -221,11 +274,20 @@ public class AgentsSpeaking
 class RelayRequest
 {
     public string type;
+    public string participantId;
     public string npc;
     public string model;
     public string system_prompt;
     public string prompt;
     public LlmOptions options;
+}
+
+[System.Serializable]
+class EvaluateInterviewMsg
+{
+    public string type;
+    public string participantId;
+    public string model;
 }
 
 [System.Serializable]
