@@ -25,7 +25,7 @@ public class LlmService : MonoBehaviour
 
     // Backchannel trigger from server.
     public System.Action<string, string> OnBackchannel;
-    public System.Action<InterviewEvaluationEvent> OnEvaluationReceived;
+    //public System.Action<InterviewEvaluationEvent> OnEvaluationReceived;
 
     private WebSocket ws;
     private readonly Dictionary<string, System.Action<string>> pending = new();
@@ -58,7 +58,7 @@ public class LlmService : MonoBehaviour
 
     async void OnApplicationQuit() => await ws?.Close();
 
-    public void RequestInterviewEvaluation(string participantId = null, string evaluatorModel = null)
+   /* public void RequestInterviewEvaluation(string participantId = null, string evaluatorModel = null)
     {
         if (ws == null || ws.State != WebSocketState.Open)
         {
@@ -77,7 +77,7 @@ public class LlmService : MonoBehaviour
 
         ws.SendText(JsonUtility.ToJson(msg));
         Debug.Log($"[LlmService] Evaluation requested with model {selectedModel}");
-    }
+    }*/
 
     /// <summary>Send a prompt to the relay server for a specific NPC.</summary>
     public void Ask(string userText, NPCProfile profile, System.Action<string> onResponse)
@@ -165,6 +165,7 @@ public class LlmService : MonoBehaviour
             return;
         }
 
+        /*
         if (baseMsg.type == "evaluation_result")
         {
             var evalMsg = JsonUtility.FromJson<EvaluationResultMsg>(raw);
@@ -179,15 +180,15 @@ public class LlmService : MonoBehaviour
                     evaluation = evalMsg.evaluation,
                     raw = evalMsg.result,
                 };
-                OnEvaluationReceived?.Invoke(evt);
-                Debug.Log($"[LlmService] Evaluation received: participant={evt.participantId}, score={evt.evaluation.score}");
+                //OnEvaluationReceived?.Invoke(evt);
+                //Debug.Log($"[LlmService] Evaluation received: participant={evt.participantId}, score={evt.evaluation.score}");
             }
             else
             {
                 Debug.LogWarning("[LlmService] evaluation_result received but could not parse evaluation payload.");
             }
             return;
-        }
+        } */
 
         if (baseMsg.type == "error")
         {
