@@ -1,0 +1,77 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f437941fa6ee4e4479a4e51ab0f1eefb, type: 3}
+  m_Name: PhysicsSettingsStore
+  m_EditorClassIdentifier: soupday.cc3_unity_tools.runtime::Reallusion.Import.PhysicsSettingsStore
+  colliderSettings: []
+  clothSettings:
+  - name: Hair_Transparency
+    maxDistance: 20
+    maxPenetration: 10
+    weightMap: {fileID: 2800000, guid: 54cdabcc422a8774880f9630324a013b, type: 3}
+    weightMapPower: 1
+    weightMapOffset: 0
+    weightMapScale: 1
+    activate: 1
+    gravity: 1
+    mass: 1
+    friction: 0.1
+    damping: 0.3
+    drag: 0
+    stretch: 0
+    bending: 0
+    softRigidCollision: 1
+    softRigidMargin: 4
+    selfCollision: 0
+    selfMargin: 1.2
+    solverFrequency: 180
+    stiffnessFrequency: 15
+    colliderThreshold: 0.5
+  - name: Hair1_Transparency
+    maxDistance: 20
+    maxPenetration: 10
+    weightMap: {fileID: 2800000, guid: 1e78b5172e638344c9747211ff868a45, type: 3}
+    weightMapPower: 1
+    weightMapOffset: 0
+    weightMapScale: 1
+    activate: 1
+    gravity: 1
+    mass: 2
+    friction: 0
+    damping: 0.25
+    drag: 0
+    stretch: 0
+    bending: 0
+    softRigidCollision: 0
+    softRigidMargin: 2
+    selfCollision: 0
+    selfMargin: 1.2
+    solverFrequency: 240
+    stiffnessFrequency: 15
+    colliderThreshold: 0.5
+  abstractColliderSettings: []
+  gizmoState:
+    gizmosEnabled: 0
+    capsuleEnabled: 0
+    clothEnabled: 0
+    sphereEnabled: 0
+    boxEnabled: 0
+    magicaCapsuleEnabled: 0
+    magicaCapsuleIconEnabled: 0
+    magicaClothEnabled: 0
+    magicaClothIconEnabled: 0
+    magicaSphereEnabled: 0
+    magicaSphereIconEnabled: 0
+    magicaPlaneEnabled: 0
+    magicaPlaneIconEnabled: 0
+    iconSize: 0
+    iconsEnabled: 0
