@@ -110,7 +110,7 @@ function chooseNpc(
 function shouldTriggerBc(st: BcState, msg: BcFeaturesMsg): BcTriggerMsg | null {
   const t = nowMs();
 
-  if (msg.vad !== 1) return null;
+ // if (msg.vad !== 1) return null;
   if (msg.pauseMs < BC_MICROPAUSE_MIN || msg.pauseMs > BC_MICROPAUSE_MAX) return null;
   if (msg.pauseMs >= BC_EOT_THRESHOLD) return null;
 
@@ -218,11 +218,14 @@ serve({
 
                    //Checks for BC  features / piggyback of features and triggers.
         if (msg.type === "bc_features") {
+          console.log(`[bc_features] vad=${msg.vad} pauseMs=${msg.pauseMs} speechMs=${msg.speechMs} addr=${msg.addressee}`);
+
               const st = (ws as any).data?.bc as BcState | undefined;
              if (!st) return;
 
             const trigger = shouldTriggerBc(st, msg as BcFeaturesMsg);
              if (trigger) {
+              console.log(`[bc_trigger] npc=${trigger.npc} action=${trigger.action}`); //remove after testing
             ws.send(JSON.stringify(trigger));
             }
              return;

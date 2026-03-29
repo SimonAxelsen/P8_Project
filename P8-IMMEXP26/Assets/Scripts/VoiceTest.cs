@@ -33,6 +33,11 @@ public class VoiceTest : MonoBehaviour
 
     private int turnIndex = 0;
 
+    public ProsodyClient prosodyClient;   // drag in inspector or FindObjectOfType
+    private int _frameSamples = 320;      // 20ms @ 16kHz
+    private float[] _frameFloat;
+    private short[] _framePcm16;
+
     void Start()
     {
         if (whisperManager == null) whisperManager = GetComponent<WhisperManager>();
@@ -40,6 +45,13 @@ public class VoiceTest : MonoBehaviour
 
         if (Microphone.devices.Length > 0) _micDevice = Microphone.devices[0];
         else Debug.LogError("No Microphone detected!");
+
+
+        prosodyClient = prosodyClient != null ? prosodyClient : FindObjectOfType<ProsodyClient>();
+
+        _frameSamples = 320; // 20ms @ 16kHz
+        _frameFloat = new float[_frameSamples];
+        _framePcm16 = new short[_frameSamples];
     }
 
     void Update()
@@ -69,51 +81,47 @@ public class VoiceTest : MonoBehaviour
     // ---Real-Time Audio Analysis ---
     void ProcessVAD()
     {
+        if (_clip == null || prosodyClient == null || !prosodyClient.Connected) return;
+
         int pos = Microphone.GetPosition(_micDevice);
+        if (pos <= 0) return;
 
-        // Analysis of small chunk of audio (256 samples) to analyze
-        if (pos > 256 && _clip != null)
+        // Avoid wrap issues: since you record 300 seconds, wrap isn’t a concern.
+        // Still clamp to avoid invalid GetData offsets.
+        if (pos < _frameSamples) return;
+
+        int start = pos - _frameSamples;
+        start = Mathf.Clamp(start, 0, _clip.samples - _frameSamples);
+
+        _clip.GetData(_frameFloat, start);
+
+        // Convert float [-1,1] -> int16 PCM
+        for (int i = 0; i < _frameSamples; i++)
         {
-            float[] samples = new float[256];
-            _clip.GetData(samples, pos - 256); // Grab the most recent audio
+            float s = Mathf.Clamp(_frameFloat[i], -1f, 1f);
+            _framePcm16[i] = (short)(s * 32767f);
+        }
 
-            // Find the peak volume in this chunk
-            float peak = 0f;
-            for (int i = 0; i < samples.Length; i++)
-            {
-                if (Mathf.Abs(samples[i]) > peak) peak = Mathf.Abs(samples[i]);
-            }
+        // Send audio frame to Python
+        prosodyClient.SendPcmFrame(_framePcm16);
 
-            // Determine if the user is currently speaking based on our threshold
-            if (peak > vadThreshold)
-            {
-                _currentSpeechMs += Time.deltaTime * 1000f;
-                _currentPauseMs = 0f; // Reset pause timer because they are making noise
-                _isCurrentlySpeaking = 1;
-            }
-            else
-            {
-                _currentPauseMs += Time.deltaTime * 1000f;
-                // If they pause for more than 1.5 seconds, we consider the speaking turn OVER  
-                if (_currentPauseMs > 1500f) _isCurrentlySpeaking = 0;
-            }
+        // Send BC features to Bun at your existing interval
+        _timeSinceLastVadSend += Time.deltaTime;
+        if (_timeSinceLastVadSend >= vadUpdateInterval && llm != null)
+        {
+            var pf = prosodyClient.Latest;
 
-            // Send this data to the Bun server every X seconds
-            _timeSinceLastVadSend += Time.deltaTime;
-            if (_timeSinceLastVadSend >= vadUpdateInterval && llm != null)
+            BcFeatures bc = new BcFeatures
             {
-                BcFeatures bc = new BcFeatures
-                {
-                    vad = _isCurrentlySpeaking,
-                    pauseMs = _currentPauseMs,
-                    speechMs = _currentSpeechMs,
-                    addressee = "UNKNOWN", // UKNOWN let's both agent do the backchanneling.
-                    agentsSpeaking = new AgentsSpeaking { HR = false, TECH = false } // Assume agents aren't talking over you
-                };
+                vad = pf.vad,
+                pauseMs = pf.pauseMs,
+                speechMs = pf.speechMs,
+                addressee = "UNKNOWN", // later: compute from gaze
+                agentsSpeaking = new AgentsSpeaking { HR = false, TECH = false }
+            };
 
-                llm.SendBackchannelFeatures(bc);
-                _timeSinceLastVadSend = 0f; // And then we reset the network timer for some reason
-            }
+            llm.SendBackchannelFeatures(bc);
+            _timeSinceLastVadSend = 0f;
         }
     }
 

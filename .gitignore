@@ -1,2 +1,42 @@
 P8-IMMEXP26/Assets/StreamingAssets/Whisper/ggml-base.en.bin
 P8-IMMEXP26/Assets/StreamingAssets/Whisper/ggml-base.en.bin.meta
+
+
+# --- Python ---
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.dll
+
+# pip / build artifacts
+build/
+dist/
+*.egg-info/
+
+# --- Unity ---
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+UserSettings/
+MemoryCaptures/
+Recordings/
+
+# Unity packages (usually keep Packages/manifest.json & packages-lock.json)
+# Packages/ is normally committed, but NOT Library/ etc.
+
+# --- Node / Bun ---
+node_modules/
+bun.lockb
+*.log
+
+# --- Project logs / outputs ---
+server/chat_log.jsonl
+server/*.jsonl
+*.log
