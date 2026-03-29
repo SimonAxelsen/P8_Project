@@ -62,7 +62,16 @@ if not exist "%VENV_DIR%\Scripts\python.exe" (
 )
 
 echo [INFO] Upgrading pip/setuptools/wheel...
-"%VENV_DIR%\Scripts\python.exe" -m pip install --upgrade pip setuptools wheel
+"%VENV_DIR%\Scripts\python.exe" -m pip install --upgrade pip wheel
+"%VENV_DIR%\Scripts\python.exe" -m pip install --upgrade pip wheel
+"%VENV_DIR%\Scripts\python.exe" -m pip install setuptools==68.2.2
+REM ---- Create pkg_resources shim if not importable ----
+"%VENV_DIR%\Scripts\python.exe" -c "import pkg_resources" >nul 2>nul
+if errorlevel 1 (
+  echo [INFO] pkg_resources not importable, installing shim...
+  "%VENV_DIR%\Scripts\python.exe" -c "import pathlib; p=pathlib.Path(r'%VENV_DIR%\Lib\site-packages\pkg_resources'); p.mkdir(exist_ok=True); (p/'__init__.py').write_text('class _D:\n    def __init__(self,v): self.version=v\ndef get_distribution(n):\n    import importlib.metadata as m\n    try: return _D(m.version(n))\n    except: return _D(\"0.0.0\")\ndef require(*a): pass\nWorkingSet=type(\"WorkingSet\",(),{\"__iter__\":lambda s:iter([])})()\n')"
+  echo [OK] pkg_resources shim installed.
+)
 if errorlevel 1 (
   echo [ERROR] pip upgrade failed.
   pause
@@ -77,18 +86,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-REM ---- Patch webrtcvad.py to avoid pkg_resources dependency ----
-set "WRTC_VAD=%VENV_DIR%\Lib\site-packages\webrtcvad.py"
-if exist "%WRTC_VAD%" (
-  findstr /i "pkg_resources" "%WRTC_VAD%" >nul 2>nul
-  if %errorlevel%==0 (
-    echo [INFO] Patching webrtcvad.py to avoid pkg_resources...
-    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-      "(Get-Content '%WRTC_VAD%') ^
-        -replace '^import\s+pkg_resources\s*$', '# import pkg_resources (patched)' ^
-        | Set-Content '%WRTC_VAD%'"
-  )
-)
+
 
 
 
