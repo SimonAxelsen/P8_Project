@@ -692,6 +692,7 @@ MonoBehaviour:
   useTextInput: 0
   vadThreshold: 0.015
   vadUpdateInterval: 0.1
+  prosodyClient: {fileID: 0}
 --- !u!1 &510725598
 GameObject:
   m_ObjectHideFlags: 0
@@ -1066,6 +1067,72 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 3.4, y: 2.12, z: -5.30288}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &673063691
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 673063694}
+  - component: {fileID: 673063693}
+  - component: {fileID: 673063692}
+  m_Layer: 0
+  m_Name: ProsodyClient
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!114 &673063692
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 673063691}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 35b8775cea1adaa4a94b410c9c982c63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProsodyClient
+  pythonUrl: ws://localhost:8765
+  sampleRate: 16000
+  frameMs: 20
+--- !u!114 &673063693
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 673063691}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 63c88ab0e442c5146a92e761990303fc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VoiceTest
+  whisperManager: {fileID: 0}
+  recordAction: {fileID: 0}
+  useTextInput: 0
+  vadThreshold: 0.015
+  vadUpdateInterval: 0.1
+  prosodyClient: {fileID: 0}
+--- !u!4 &673063694
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 673063691}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -32.13837, y: -0, z: 1.0953}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2162,6 +2229,7 @@ GameObject:
   - component: {fileID: 1354645185}
   - component: {fileID: 1354645184}
   - component: {fileID: 1354645186}
+  - component: {fileID: 1354645187}
   m_Layer: 0
   m_Name: WhisperManager
   m_TagString: Untagged
@@ -2185,7 +2253,7 @@ MonoBehaviour:
   modelPath: Whisper/ggml-base.en.bin
   isModelPathInStreamingAssets: 1
   initOnAwake: 1
-  useGpu: 0
+  useGpu: 1
   flashAttention: 0
   language: en
   translateToEnglish: 0
@@ -2233,6 +2301,21 @@ MonoBehaviour:
   useElevenLabsAudio: 0
   elevenLabsAudioSource: {fileID: 0}
   defaultEvaluatorModel: qwen2.5:14b
+--- !u!114 &1354645187
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1354645182}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 35b8775cea1adaa4a94b410c9c982c63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ProsodyClient
+  pythonUrl: ws://localhost:8765
+  sampleRate: 16000
+  frameMs: 20
 --- !u!4 &1408642648 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7917674758326848202, guid: 77e7c27b2c5525e4aa8cc9f99d654486, type: 3}
@@ -45236,3 +45319,4 @@ SceneRoots:
   - {fileID: 1353643323}
   - {fileID: 1641983603}
   - {fileID: 564431127}
+  - {fileID: 673063694}
