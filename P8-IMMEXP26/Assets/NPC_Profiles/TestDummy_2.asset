@@ -15,9 +15,12 @@ MonoBehaviour:
   profile:
     npcName: HR
     modelName: hr_interviewer
-    systemPrompt: 
-    contextPrompt: 
-    personalityTraits: 
+    systemPrompt: YOU'RE NON-APOLEGETIC, YOU HATE WORKING HERE, YOU HATE THE CANDIDATE,
+      YOU HATE EVERYTHING
+    contextPrompt: YOU'RE NON-APOLEGETIC, YOU HATE WORKING HERE, YOU HATE THE CANDIDATE,
+      YOU HATE EVERYTHING
+    personalityTraits: YOU'RE NON-APOLEGETIC, YOU HATE WORKING HERE, YOU HATE THE
+      CANDIDATE, YOU HATE EVERYTHING
     voiceModelName: en_US-lessac-medium
-    temperature: 0.7
+    temperature: 2
     repeatPenalty: 1
