@@ -5,7 +5,7 @@ REM Always run from this script's folder
 cd /d "%~dp0"
 echo [StartProsody] Working dir: %CD%
 
-REM Venv in LocalAppData (avoids execute restrictions on repo drive / OneDrive)
+REM Venv in LocalAppData
 set "VENV_DIR=%LOCALAPPDATA%\P8_Project\p8venv"
 set "PYTHON_CMD="
 
@@ -33,7 +33,7 @@ if "%PYTHON_CMD%"=="" (
 :found_python
 if "%PYTHON_CMD%"=="" (
   echo [ERROR] No working Python found.
-  echo Install Python 3.11+ from python.org and check "Add Python to PATH".
+  echo Install Python 3.11+ from python.org and check Add Python to PATH.
   pause
   exit /b 1
 )
@@ -67,12 +67,38 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo [OK] Starting prosody server + monitor...
+REM ---- Sanity checks ----
+echo [DEBUG] VENV_DIR=%VENV_DIR%
 
-start "Prosody Server" "%VENV_DIR%\Scripts\python.exe" prosody_server.py
-timeout /t 1 >nul
+if not exist "%VENV_DIR%\Scripts\python.exe" (
+  echo [ERROR] venv python not found at: %VENV_DIR%\Scripts\python.exe
+  pause
+  exit /b 1
+)
 
-start "Prosody Monitor" "%VENV_DIR%\Scripts\python.exe" prosody_monitor.py
+if not exist "%CD%\prosody_server.py" (
+  echo [ERROR] prosody_server.py not found in: %CD%
+  pause
+  exit /b 1
+)
+
+if not exist "%CD%\debug_browser.py" (
+  echo [ERROR] debug_browser.py not found in: %CD%
+  echo Create the file server\debug_browser.py first.
+  pause
+  exit /b 1
+)
+
+echo [OK] Starting prosody server + browser dashboard...
+
+REM IMPORTANT: use start "" so quoting doesn't break
+start "" "%VENV_DIR%\Scripts\python.exe" "%CD%\prosody_server.py"
+timeout /t 2 >nul
+
+start "" "%VENV_DIR%\Scripts\python.exe" "%CD%\debug_browser.py"
+timeout /t 2 >nul
+
+start "" "http://localhost:8000"
 
 echo [OK] Started. Keep these windows open while running Unity.
 pause
