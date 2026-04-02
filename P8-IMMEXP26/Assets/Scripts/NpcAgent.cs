@@ -25,6 +25,16 @@ public class NpcAgent : MonoBehaviour
     private AudioSource audioSource;
     private LlmService llm;
 
+    // --- NEW: ANIMATION VARIATION DICTIONARY ---
+    // Define how many variations each trigger has. 
+    // Example: "gesture_mephoric", 3 means it rolls between 0, 1, and 2.
+    private Dictionary<string, int> animationVariations = new Dictionary<string, int>()
+    {
+        { "gesture_mephoric", 3 }, 
+        { "gesture_deictic", 2 },  
+        // Add future randomized tags here!
+    };
+
     private struct TimedTag
     {
         public string triggerName;
@@ -163,12 +173,32 @@ public class NpcAgent : MonoBehaviour
         }
     }
 
+    // --- UPDATED ANIMATOR TRIGGER LOGIC ---
     private void FireAnimatorTrigger(string triggerName)
     {
         if (animator != null)
         {
-            try { animator.SetTrigger(triggerName); }
-            catch { Debug.LogWarning($"{name}: Animator missing trigger '{triggerName}'"); }
+            try 
+            { 
+                // 1. Check if the tag has random variations defined in our Dictionary
+                if (animationVariations.TryGetValue(triggerName, out int variationCount))
+                {
+                    // 2. Roll a random number
+                    int randomIndex = Random.Range(0, variationCount);
+                    
+                    // 3. Set the universal VariationIndex parameter
+                    animator.SetInteger("VariationIndex", randomIndex);
+                    
+                    Debug.Log($"[Animator] Randomizing '{triggerName}' - Rolled Index: {randomIndex}");
+                }
+
+                // 4. Fire the trigger (whether it was randomized or not)
+                animator.SetTrigger(triggerName); 
+            }
+            catch 
+            { 
+                Debug.LogWarning($"{name}: Animator missing trigger '{triggerName}'"); 
+            }
         }
     }
 
