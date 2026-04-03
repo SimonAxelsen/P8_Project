@@ -42,8 +42,6 @@ services:
       - "${DEBUG_BROWSER_PORT:-8000}:8000"
     depends_on:
       - prosody
-    profiles:
-      - debug
     restart: unless-stopped
 
 volumes:
