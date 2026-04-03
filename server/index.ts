@@ -4,12 +4,11 @@ import { join } from "path";
 import { sendElevenLabsTts } from "./elevenlabs";
 import { evaluateInterview } from "./evaluator.ts";
 
-const PORT = 3001;
+const PORT = Number(process.env.PORT ?? 3001);
 const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434/api/generate";
-const LOG_FILE = join(import.meta.dir, "chat_log.jsonl");
+const LOG_FILE = process.env.CHAT_LOG_FILE ?? join(import.meta.dir, "chat_log.jsonl");
 
-// Flip this one line to turn ElevenLabs on/off (plus set ELEVENLABS_API_KEY in .env).
-const ENABLE_ELEVENLABS = true;
+const ENABLE_ELEVENLABS = (process.env.ENABLE_ELEVENLABS ?? "true").toLowerCase() === "true";
 
 // --- THE INVISIBLE SCORECARD ---
 function getInitialState() {

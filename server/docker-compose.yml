@@ -1,0 +1,50 @@
+services:
+  bun-relay:
+    build:
+      context: .
+      dockerfile: Dockerfile.bun
+    environment:
+      PORT: ${BUN_PORT:-3001}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434/api/generate}
+      CHAT_LOG_FILE: /app/data/chat_log.jsonl
+      ENABLE_ELEVENLABS: ${ENABLE_ELEVENLABS:-false}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+    ports:
+      - "${BUN_PORT:-3001}:3001"
+    volumes:
+      - bun-chat-data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  prosody:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    command: ["python", "prosody_server.py"]
+    environment:
+      PROSODY_HOST: 0.0.0.0
+      PROSODY_PORT: 8765
+    ports:
+      - "${PROSODY_PORT:-8765}:8765"
+    restart: unless-stopped
+
+  prosody-debug:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    command: ["python", "debug_browser.py"]
+    environment:
+      PROSODY_WS: ws://prosody:8765
+      DEBUG_BROWSER_HOST: 0.0.0.0
+      DEBUG_BROWSER_PORT: 8000
+    ports:
+      - "${DEBUG_BROWSER_PORT:-8000}:8000"
+    depends_on:
+      - prosody
+    profiles:
+      - debug
+    restart: unless-stopped
+
+volumes:
+  bun-chat-data:

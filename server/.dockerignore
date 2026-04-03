@@ -1,0 +1,12 @@
+node_modules
+.env
+chat_log.jsonl
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache
+.mypy_cache
+.venv
+venv

@@ -1,11 +1,14 @@
 import asyncio
 import json
+import os
 import websockets
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 import uvicorn
 
-PROSODY_WS = "ws://localhost:8765"  # your prosody_server
+PROSODY_WS = os.getenv("PROSODY_WS", "ws://localhost:8765")
+DEBUG_BROWSER_HOST = os.getenv("DEBUG_BROWSER_HOST", "127.0.0.1")
+DEBUG_BROWSER_PORT = int(os.getenv("DEBUG_BROWSER_PORT", "8000"))
 latest = None
 clients = set()
 
@@ -172,4 +175,4 @@ async def _startup():
     asyncio.create_task(prosody_listener())
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host=DEBUG_BROWSER_HOST, port=DEBUG_BROWSER_PORT)

@@ -1,7 +1,10 @@
-import asyncio, json, time
+import asyncio, json, os, time
 import numpy as np
 import websockets
 import pyworld as pw
+
+HOST = os.getenv("PROSODY_HOST", "0.0.0.0")
+PORT = int(os.getenv("PROSODY_PORT", "8765"))
 
 # ---------------------------
 # Audio format expected from Unity
@@ -200,9 +203,11 @@ async def handler(ws):
         SUBSCRIBERS.discard(ws)
 
 async def main():
-    async with websockets.serve(handler, "0.0.0.0", 8765, max_size=2**23):
-        print("Prosody server on ws://0.0.0.0:8765")
+    async with websockets.serve(handler, HOST, PORT, max_size=2**23):
+        print(f"Prosody server on ws://{HOST}:{PORT}")
         await asyncio.Future()
 
 if __name__ == "__main__":
     asyncio.run(main())
+HOST = os.getenv("PROSODY_HOST", "0.0.0.0")
+PORT = int(os.getenv("PROSODY_PORT", "8765"))
