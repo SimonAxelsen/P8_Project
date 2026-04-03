@@ -1,11 +1,15 @@
 import asyncio
 import json
+import os
 import websockets
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 import uvicorn
 
-PROSODY_WS = "ws://localhost:8765"
+PROSODY_WS = os.getenv("PROSODY_WS", "ws://localhost:8765")
+DEBUG_BROWSER_HOST = os.getenv("DEBUG_BROWSER_HOST", "127.0.0.1")
+DEBUG_BROWSER_PORT = int(os.getenv("DEBUG_BROWSER_PORT", "8000"))
+
 latest = None
 clients = set()
 
@@ -33,6 +37,7 @@ HTML = r"""
     .k { color:#666; }
     .v { font-weight: 600; }
     canvas { max-width: 1200px; }
+    code { background: #f5f5f5; padding: 2px 4px; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -61,7 +66,7 @@ HTML = r"""
       <h3>Latest values</h3>
       <div class="grid" id="kvGrid"></div>
       <div class="small" style="margin-top:8px;">
-        Source: <code>ws://localhost:8765</code> (monitor mode) → <code>http://localhost:8000</code>
+        Source: <code id="srcWs">ws://localhost:8765</code> (monitor mode) → <code id="srcHttp">http://127.0.0.1:8000</code>
       </div>
     </div>
   </div>
@@ -299,4 +304,4 @@ async def _startup():
     asyncio.create_task(prosody_listener())
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host=DEBUG_BROWSER_HOST, port=DEBUG_BROWSER_PORT)
