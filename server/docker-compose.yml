@@ -24,7 +24,7 @@ services:
     command: ["python", "prosody_server.py"]
     environment:
       PROSODY_HOST: 0.0.0.0
-      PROSODY_PORT: 8765
+      PROSODY_PORT: 8765:8765
     ports:
       - "${PROSODY_PORT:-8765}:8765"
     restart: unless-stopped
