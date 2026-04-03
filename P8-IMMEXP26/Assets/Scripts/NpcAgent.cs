@@ -30,9 +30,7 @@ public class NpcAgent : MonoBehaviour
     // Example: "gesture_mephoric", 3 means it rolls between 0, 1, and 2.
     private Dictionary<string, int> animationVariations = new Dictionary<string, int>()
     {
-        { "gesture_mephoric", 3 }, 
-        { "gesture_deictic", 2 },  
-        // Add future randomized tags here!
+        { "gesture_explain", 5 }, 
     };
 
     private struct TimedTag
