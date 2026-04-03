@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.bun
-    network_mode: "host"  # 
+    network_mode: "host"
     environment:
       PORT: ${BUN_PORT:-3001}
       OLLAMA_URL: ${OLLAMA_URL:-http://localhost:11434/api/generate} 
