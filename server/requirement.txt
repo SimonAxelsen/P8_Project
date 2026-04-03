@@ -5,3 +5,6 @@ pyworld
 matplotlib
 fastapi
 uvicorn
+scipy
+librosa
+soundfile
