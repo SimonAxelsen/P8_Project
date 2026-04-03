@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 08a20c56f30685041b2974a5fdd15081
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Prefabs/Props/Microphone.prefab
+  uploadId: 829404

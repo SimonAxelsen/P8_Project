@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: b97e15a9629c4c642b65fed239447b40
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Prefabs/Facilities/AirVent_01.prefab
+  uploadId: 829404

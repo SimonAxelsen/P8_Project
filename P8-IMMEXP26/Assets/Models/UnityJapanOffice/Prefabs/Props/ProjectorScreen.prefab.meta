@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 9f6fa955f870ec44f9bdb825aef472cc
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Prefabs/Props/ProjectorScreen.prefab
+  uploadId: 829404

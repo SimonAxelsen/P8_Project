@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 7f622298b4db6394fbf43b5f57abae59
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Materials/Office/TrashSigns.mat
+  uploadId: 829404

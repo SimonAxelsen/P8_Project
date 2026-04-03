@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: faf4f265ad0f4e94487d34cfacb55b89
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Prefabs/Props/Speaker_02.prefab
+  uploadId: 829404

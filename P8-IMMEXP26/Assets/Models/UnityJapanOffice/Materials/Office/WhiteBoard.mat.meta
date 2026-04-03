@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8c82bf749831d9f4c823ff25b45cb35b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Materials/Office/WhiteBoard.mat
+  uploadId: 829404

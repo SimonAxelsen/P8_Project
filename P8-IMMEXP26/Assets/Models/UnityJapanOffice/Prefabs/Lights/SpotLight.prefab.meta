@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 2ee99ecbb6761a546a63eb5cc88dcc09
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Prefabs/Lights/SpotLight.prefab
+  uploadId: 829404

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: aeedecf888f74084ebec589b2c33091a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 152800
+  packageName: UnityJapanOffice
+  packageVersion: 1.0.9
+  assetPath: Assets/UnityJapanOffice/Materials/Office/Logo.mat
+  uploadId: 829404
