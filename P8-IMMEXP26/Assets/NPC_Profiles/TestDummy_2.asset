@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NPCProfileAsset
   profile:
     npcName: HR
-    modelName: hr_interviewer
+    modelName: interviewee_1:latest
     systemPrompt: YOU'RE NON-APOLEGETIC, YOU HATE WORKING HERE, YOU HATE THE CANDIDATE,
       YOU HATE EVERYTHING
     contextPrompt: YOU'RE NON-APOLEGETIC, YOU HATE WORKING HERE, YOU HATE THE CANDIDATE,
