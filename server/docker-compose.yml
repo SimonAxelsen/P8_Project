@@ -3,18 +3,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.bun
+    network_mode: "host"  # 
     environment:
       PORT: ${BUN_PORT:-3001}
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434/api/generate}
+      OLLAMA_URL: ${OLLAMA_URL:-http://localhost:11434/api/generate} 
       CHAT_LOG_FILE: /app/data/chat_log.jsonl
       ENABLE_ELEVENLABS: ${ENABLE_ELEVENLABS:-false}
       ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
-    ports:
-      - "${BUN_PORT:-3001}:3001"
     volumes:
       - bun-chat-data:/app/data
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   prosody:

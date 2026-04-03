@@ -11,7 +11,8 @@ COPY modelfiles ./modelfiles
 RUN mkdir -p /app/data
 
 ENV PORT=3001
-ENV OLLAMA_URL=http://host.docker.internal:11434/api/generate
+
+ENV OLLAMA_URL=http://localhost:11434/api/generate 
 ENV CHAT_LOG_FILE=/app/data/chat_log.jsonl
 ENV ENABLE_ELEVENLABS=false
 
