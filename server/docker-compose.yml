@@ -26,7 +26,7 @@ services:
       PROSODY_HOST: 0.0.0.0
       PROSODY_PORT: 8765
     ports:
-      - "${PROSODY_PORT:-8765}:8765"
+      - "8765:8765"
     restart: unless-stopped
 
   prosody-debug:
@@ -42,8 +42,6 @@ services:
       - "${DEBUG_BROWSER_PORT:-8000}:8000"
     depends_on:
       - prosody
-    profiles:
-      - debug
     restart: unless-stopped
 
 volumes:
