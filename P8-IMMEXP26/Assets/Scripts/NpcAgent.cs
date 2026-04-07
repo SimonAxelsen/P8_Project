@@ -24,6 +24,7 @@ public class NpcAgent : MonoBehaviour
 
     private AudioSource audioSource;
     private LlmService llm;
+    private ConversationMemory conversationMemory;
 
     // --- NEW: ANIMATION VARIATION DICTIONARY ---
     // Define how many variations each trigger has. 
@@ -42,6 +43,7 @@ public class NpcAgent : MonoBehaviour
     void Start()
     {
         llm = FindObjectOfType<LlmService>();
+        conversationMemory = GetComponent<ConversationMemory>();
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
         if (animator == null) animator = GetComponentInChildren<Animator>();
@@ -54,7 +56,15 @@ public class NpcAgent : MonoBehaviour
     public void Say(string userText)
     {
         if (Profile == null) { Debug.LogWarning($"{name}: No NPC profile assigned!"); return; }
-        llm.Ask(userText, Profile, OnLlmResponse);
+        
+        // Store the question immediately
+        if (conversationMemory != null) conversationMemory.StoreQuestion(userText);
+        
+        // Get conversation context to add to the prompt for more natural responses
+        string context = conversationMemory != null ? conversationMemory.GetContextForPrompt() : "";
+        
+        // Pass context to the LLM so it understands the conversation history
+        llm.Ask(userText, Profile, OnLlmResponse, context);
     }
 
     public void OnLlmResponse(string raw)
@@ -88,6 +98,7 @@ public class NpcAgent : MonoBehaviour
         }
 
         Debug.Log($"<color=cyan>[{Profile.npcName} TTS]</color> {cleanDialogue}");
+        if (conversationMemory != null) conversationMemory.StoreResponse(cleanDialogue);
         OnResponseReceived?.Invoke(cleanDialogue);
 
         GenerateAndPlay(cleanDialogue, timedTags);

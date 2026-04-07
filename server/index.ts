@@ -30,6 +30,46 @@ function getInitialState() {
 
 let interviewState = getInitialState();
 
+// --- CONVERSATION MEMORY ---
+// Track recent exchanges in a rolling window for natural multi-turn context
+type ConversationExchange = {
+  user: string;
+  npc: string;
+};
+
+type ConversationMemory = {
+  exchanges: ConversationExchange[];
+  maxExchanges: number;
+};
+
+function getInitialMemory(): ConversationMemory {
+  return {
+    exchanges: [],
+    maxExchanges: 4  // Keep last 4 exchanges for context
+  };
+}
+
+function addExchangeToMemory(memory: ConversationMemory, userText: string, npcText: string) {
+  memory.exchanges.push({ user: userText, npc: npcText });
+  
+  // Trim to max window size (FIFO - oldest exchanges are removed)
+  if (memory.exchanges.length > memory.maxExchanges) {
+    memory.exchanges.shift();
+  }
+}
+
+function getContextForPrompt(memory: ConversationMemory): string {
+  if (memory.exchanges.length === 0) return "";
+  
+  let context = "[CONVERSATION HISTORY]\n";
+  context += "Recent exchanges:\n";
+  memory.exchanges.forEach((ex, idx) => {
+    context += `${idx + 1}. User: ${ex.user}\n   Assistant: ${ex.npc}\n`;
+  });
+  context += "[/CONVERSATION HISTORY]\n\n";
+  return context;
+}
+
 // Append one JSON line to the log file (sync is fine for small writes)
 function log(entry: Record<string, unknown>) {
   appendFileSync(LOG_FILE, JSON.stringify({ ts: Date.now(), ...entry }) + "\n");
@@ -202,11 +242,14 @@ serve({
       interviewState = getInitialState();
       console.log("[SYSTEM] New interview session started. State wiped clean.");
 
-    (ws as any).data = (ws as any).data ?? {};
-    (ws as any).data.bc = {
-    lastGlobalTs: 0,
-    lastPerNpcTs: { HR: 0, TECH: 0 },
-    } satisfies BcState;
+      (ws as any).data = (ws as any).data ?? {};
+      (ws as any).data.bc = {
+        lastGlobalTs: 0,
+        lastPerNpcTs: { HR: 0, TECH: 0 },
+      } satisfies BcState;
+      
+      // Initialize conversation memory for this session
+      (ws as any).data.conversationMemory = getInitialMemory();
 
       ws.send(JSON.stringify({ type: "connected" }));
     },
@@ -271,21 +314,33 @@ serve({
           const currentScore = Math.min(interviewState.scores[interviewState.categoryIndex] ?? 0, 100); 
           const pointsNeeded = 100 - currentScore;
 
-          // --- BRUTE FORCE ORCHESTRATOR ---
-          // The Server now explicitly commands the AI on exactly what to do.
+          // --- ADAPTIVE ORCHESTRATOR ---
+          // The server guides the AI but allows natural flow
           let forcedAction = "";
           if (msg.prompt.includes("[KICKOFF]")) {
-              forcedAction = "SPEAKER MUST BE HR. Output 'addProgress': 0. Welcome the candidate and ask an icebreaker.";
+              forcedAction = "SPEAKER MUST BE HR. Output 'addProgress': 0. Welcome the candidate warmly and ask an engaging icebreaker question.";
           } else if (interviewState.categoryIndex === interviewState.categories.length - 1) {
-              forcedAction = "SPEAKER MUST BE HR. Output 'addProgress': 0. Wrap up the interview and say goodbye.";
-          } else if (interviewState.questionCount >= 2) {
-              // 3-STRIKE RULE ENFORCER:
-              forcedAction = `THIS IS THE FINAL QUESTION FOR THIS CATEGORY. SPEAKER MUST BE HR. Output 'addProgress': 25. You MUST say 'Let's move on' and ask the lead question for: ${nextCategory}.`;
+              forcedAction = "SPEAKER MUST BE HR. Output 'addProgress': 0. Wrap up the interview professionally, thank the candidate, and say goodbye.";
+          } else if (interviewState.questionCount === 2) {
+              // Soft warning: suggest moving on if answer is strong
+              forcedAction = `You've asked 2 questions in this category. Evaluate the answer carefully. IF Grade >= ${pointsNeeded}, SPEAKER MUST BE HR and smoothly transition by saying something like "Great insights! Let's move on to..." and introduce: ${nextCategory}. IF Grade < ${pointsNeeded}, SPEAKER MUST BE TECH with ONE final clarifying question before we move on.`;
+          } else if (interviewState.questionCount >= 3) {
+              // Hard limit: force transition
+              forcedAction = `MAXIMUM QUESTIONS REACHED. SPEAKER MUST BE HR. Output 'addProgress': ${pointsNeeded}. Say something natural like "Excellent, I think we have a good sense of this area. Let's discuss..." and transition to: ${nextCategory}.`;
           } else {
-              // STANDARD GRADING:
-              forcedAction = `Evaluate the answer. IF Grade >= ${pointsNeeded}, speaker MUST be HR and move to ${nextCategory}. IF Grade < ${pointsNeeded}, speaker MUST be TECH and ask a follow-up.`;
+              // Standard grading: adaptive speaker assignment
+              forcedAction = `Evaluate the candidate's answer thoughtfully. IF Grade >= ${pointsNeeded}, SPEAKER MUST BE HR and naturally transition to ${nextCategory} with a brief acknowledgment. IF Grade < ${pointsNeeded}, SPEAKER can be TECH or HR (whoever fits naturally) and ask a relevant follow-up question to probe deeper.`;
           }
 
+          // Get conversation context to make responses more natural
+          const conversationMemory = (ws as any).data?.conversationMemory as ConversationMemory | undefined;
+          const conversationContext = conversationMemory ? getContextForPrompt(conversationMemory) : "";
+          
+          // --- FIX: Only store actual user speech, not meta commands ---
+          const isMetaCommand = msg.prompt.includes("[KICKOFF]") || msg.prompt.includes("[SYSTEM");
+          const cleanUserInput = isMetaCommand ? "" : msg.prompt;
+
+          // Build the full prompt with clear separation
           const systemContext = `
 [SYSTEM CONTEXT - DO NOT READ ALOUD]
 Current Category: ${interviewState.categories[interviewState.categoryIndex]}
@@ -295,7 +350,7 @@ Next Category: ${nextCategory}
 ${forcedAction}
 [/SYSTEM CONTEXT]
 
-User Answer: "${msg.prompt}"
+${conversationContext}${isMetaCommand ? msg.prompt : `User Answer: "${msg.prompt}"`}
 `;
           // 
           const fullPrompt = systemContext;
@@ -314,6 +369,12 @@ User Answer: "${msg.prompt}"
           // Parse the JSON block and tags using your existing helper function
           const parsed = parseLlmResponse(rawResponse);
 
+          // --- FIX: Store complete exchange in rolling window memory ---
+          if (conversationMemory && !isMetaCommand && parsed.ttsCleanText) {
+            addExchangeToMemory(conversationMemory, msg.prompt, parsed.ttsCleanText);
+            console.log(`[Memory] Stored exchange. History size: ${conversationMemory.exchanges.length}/${conversationMemory.maxExchanges}`);
+          }
+
           // 2. PROCESS THE GRADE AND GAME LOOP
           let currentSpeaker = "HR"; 
           
@@ -329,17 +390,22 @@ User Answer: "${msg.prompt}"
                 console.log(`[SCORE] +${parsed.state.addProgress}. Category Total: ${interviewState.scores[interviewState.categoryIndex]}%`);
             }
 
-            // --- THE FIX: CHECK THE ARRAY SCORE ---
-            // We now check if THIS specific category has 100 points!
-            if ((interviewState.scores[interviewState.categoryIndex] ?? 0) >= 100 || interviewState.questionCount >= 3) {
-              
+            // --- ADAPTIVE CATEGORY PROGRESSION ---
+            // Check if THIS category has reached completion threshold
+            const categoryComplete = (interviewState.scores[interviewState.categoryIndex] ?? 0) >= 100;
+            const questionLimitReached = interviewState.questionCount >= 3;
+            
+            if (categoryComplete || questionLimitReached) {
                 // Only move to the next category if we AREN'T on the final Outro step
                 if (interviewState.categoryIndex < interviewState.categories.length - 1) {
+                    const previousCategory = interviewState.categories[interviewState.categoryIndex];
                     interviewState.categoryIndex++;
-                    interviewState.questionCount = 0; // Reset questions for the new level!
-                    console.log(`[LEVEL UP] Moving to category: ${interviewState.categories[interviewState.categoryIndex]}`);
+                    interviewState.questionCount = 0; // Reset questions for the new category
+                    
+                    const reason = categoryComplete ? "100% score reached" : "question limit reached";
+                    console.log(`[PHASE TRANSITION] ${previousCategory} → ${interviewState.categories[interviewState.categoryIndex]} (${reason})`);
                 } else {
-                    console.log(`[INTERVIEW COMPLETE] We are in the Outro phase.`);
+                    console.log(`[INTERVIEW COMPLETE] Outro phase active.`);
                 }
             }
           }
