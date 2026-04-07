@@ -30,6 +30,11 @@ public class LlmService : MonoBehaviour
     private WebSocket ws;
     private readonly Dictionary<string, System.Action<string>> pending = new();
     public static event System.Action<InterviewGameData> OnGameDataUpdated;
+    
+    // Connection status
+    public bool IsConnected => ws != null && ws.State == WebSocketState.Open;
+    public System.Action OnConnected;
+    public System.Action OnDisconnected;
 
     void Awake()
     {
@@ -42,10 +47,18 @@ public class LlmService : MonoBehaviour
     async void Start()
     {
         ws = new WebSocket(serverUrl);
-        ws.OnOpen    += ()  => Debug.Log("[LlmService] Connected to relay");
+        ws.OnOpen    += () => { 
+            Debug.Log($"[LlmService] Connected to relay at {serverUrl}");
+            OnConnected?.Invoke();
+        };
         ws.OnError   += (e) => Debug.LogError($"[LlmService] WS error: {e}");
-        ws.OnClose   += (_) => Debug.Log("[LlmService] WS closed");
+        ws.OnClose   += (_) => { 
+            Debug.Log("[LlmService] WS closed");
+            OnDisconnected?.Invoke();
+        };
         ws.OnMessage += OnMessage;
+        
+        Debug.Log($"[LlmService] Connecting to {serverUrl}...");
         await ws.Connect();
     }
 
@@ -83,7 +96,10 @@ public class LlmService : MonoBehaviour
     public void Ask(string userText, NPCProfile profile, System.Action<string> onResponse, string conversationContext = "")
     {
         if (ws == null || ws.State != WebSocketState.Open)
-        { Debug.LogError("[LlmService] WebSocket not connected"); return; }
+        { 
+            Debug.LogError($"[LlmService] WebSocket not connected. Current state: {(ws != null ? ws.State.ToString() : "null")}. Server URL: {serverUrl}");
+            return; 
+        }
 
         string npcKey = profile.npcName;
         pending[npcKey] = onResponse;
