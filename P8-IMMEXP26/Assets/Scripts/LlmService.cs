@@ -79,8 +79,8 @@ public class LlmService : MonoBehaviour
         Debug.Log($"[LlmService] Evaluation requested with model {selectedModel}");
     }*/
 
-    /// <summary>Send a prompt to the relay server for a specific NPC.</summary>
-    public void Ask(string userText, NPCProfile profile, System.Action<string> onResponse)
+    /// <summary>Send a prompt to the relay server for a specific NPC. Optionally include conversation context for more natural responses.</summary>
+    public void Ask(string userText, NPCProfile profile, System.Action<string> onResponse, string conversationContext = "")
     {
         if (ws == null || ws.State != WebSocketState.Open)
         { Debug.LogError("[LlmService] WebSocket not connected"); return; }
@@ -88,11 +88,11 @@ public class LlmService : MonoBehaviour
         string npcKey = profile.npcName;
         pending[npcKey] = onResponse;
 
-        // Gather phase instructions to structure the interview dynamically
-        string phaseContext = "";
-        if (InterviewManager.Instance != null)
+        // Build the full prompt with conversation context if provided
+        string fullPrompt = userText;
+        if (!string.IsNullOrEmpty(conversationContext))
         {
-            phaseContext =  "\n" + InterviewManager.Instance.GetPhaseContext();
+            fullPrompt = conversationContext + userText;
         }
 
         var msg = new RelayRequest
@@ -101,9 +101,8 @@ public class LlmService : MonoBehaviour
             participantId = InterviewManager.Instance != null ? InterviewManager.Instance.GetOrCreateParticipantId() : "unknown",
             npc = npcKey,
             model = profile.modelName,
-            // FIX: Remove the '+ phaseContext'. Let the Modelfile and Server do the thinking!
             system_prompt = profile.GetSystemPrompt(),
-            prompt = userText,
+            prompt = fullPrompt,
             options = new LlmOptions
             {
                 temperature = profile.temperature,
