@@ -54,18 +54,13 @@ public class NpcAgent : MonoBehaviour
     }
 
     public void Say(string userText)
-    {
-        if (Profile == null) { Debug.LogWarning($"{name}: No NPC profile assigned!"); return; }
-        
-        // Store the question immediately
-        if (conversationMemory != null) conversationMemory.StoreQuestion(userText);
-        
-        // Get conversation context to add to the prompt for more natural responses
-        string context = conversationMemory != null ? conversationMemory.GetContextForPrompt() : "";
-        
-        // Pass context to the LLM so it understands the conversation history
-        llm.Ask(userText, Profile, OnLlmResponse, context);
-    }
+{
+    if (Profile == null) { Debug.LogWarning($"{name}: No NPC profile assigned!"); return; }
+    
+    // Let the Node.js server handle all the conversation history!
+    // Just pass an empty string for the context.
+    llm.Ask(userText, Profile, OnLlmResponse, "");
+}
 
     public void OnLlmResponse(string raw)
     {

@@ -2453,7 +2453,7 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 7059235612864326372, guid: 9e3aeb3b92d317243a4736bc3c6b6726, type: 3}
   m_PrefabInstance: {fileID: 4608519717468889599}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 1549052245}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0aa77c46dc1337046a2c84ba75d04dc7, type: 3}
@@ -2654,6 +2654,28 @@ Transform:
   - {fileID: 2039757472}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1549052245 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5722576946961542989, guid: 9e3aeb3b92d317243a4736bc3c6b6726, type: 3}
+  m_PrefabInstance: {fileID: 4608519717468889599}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1549052251
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1549052245}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e24eb38f72a03941b2bb9832096109b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  myLipSync: {fileID: 1153657660373431903}
+  coAgentLipSync: {fileID: 631580303}
+  speakingThreshold: 0.01
+  gazeSpeed: 3
+  silenceHoldTime: 0.5
 --- !u!1 &1641983601
 GameObject:
   m_ObjectHideFlags: 0
@@ -4301,12 +4323,32 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1169512597323385976, guid: 40eb9d5438f3d1a4793ae7749ef4c3ad, type: 3}
       insertIndex: -1
       addedObject: {fileID: 707502118}
+    - targetCorrespondingSourceObject: {fileID: 1169512597323385976, guid: 40eb9d5438f3d1a4793ae7749ef4c3ad, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1913966191}
   m_SourcePrefab: {fileID: 100100000, guid: 40eb9d5438f3d1a4793ae7749ef4c3ad, type: 3}
 --- !u!95 &1913966190 stripped
 Animator:
   m_CorrespondingSourceObject: {fileID: 5589263983493483704, guid: 40eb9d5438f3d1a4793ae7749ef4c3ad, type: 3}
   m_PrefabInstance: {fileID: 1913966189}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1913966191
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 707502112}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e24eb38f72a03941b2bb9832096109b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ConversationalGazeBrain
+  myLipSync: {fileID: 631580303}
+  coAgentLipSync: {fileID: 1153657660373431903}
+  speakingThreshold: 0.01
+  gazeSpeed: 3
+  silenceHoldTime: 0.5
 --- !u!1 &2039757471
 GameObject:
   m_ObjectHideFlags: 0
@@ -4552,6 +4594,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   llmService: {fileID: 1354645186}
   hrAgent: {fileID: 1153657660373431901}
+  connectionTimeout: 10
 --- !u!1 &474996925600551
 GameObject:
   m_ObjectHideFlags: 0
@@ -6216,6 +6259,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e338bdfbdad4e2a479dad1df1687fdb2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NpcAgent
+--- !u!114 &1153657660373431903 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7260411475047633617, guid: 9e3aeb3b92d317243a4736bc3c6b6726, type: 3}
+  m_PrefabInstance: {fileID: 4608519717468889599}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87560e04aa74c7a41acb9c87051c3b02, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: uLipSync.Runtime::uLipSync.uLipSync
 --- !u!4 &1255397285692567206
 Transform:
   m_ObjectHideFlags: 0
@@ -27971,6 +28025,9 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 5722576946961542989, guid: 9e3aeb3b92d317243a4736bc3c6b6726, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1549052251}
     - targetCorrespondingSourceObject: {fileID: 4183466631539764852, guid: 9e3aeb3b92d317243a4736bc3c6b6726, type: 3}
       insertIndex: -1
       addedObject: {fileID: 813701700}
