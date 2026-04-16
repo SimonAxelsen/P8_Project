@@ -55,28 +55,54 @@ public class VoiceTest : MonoBehaviour
     }
 
     void Update()
+    {
+        if (useTextInput)
+        {
+            if (Keyboard.current != null && Keyboard.current.enterKey.wasPressedThisFrame && !_showInput)
+            {
+                _showInput = true;
+            }
+            return;
+        }
+
+        if (recordAction != null && recordAction.action.WasPressedThisFrame())
+{
+    // Grab the exact scene name (Case-Sensitive!)
+    string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+
+    // 1. PRIMARY FEATURE: We are in the interview, handle voice recording!
+    if (currentScene == "CoreScene")
     {
-        if (useTextInput)
+        if (Microphone.IsRecording(_micDevice)) 
         {
-            if (Keyboard.current != null && Keyboard.current.enterKey.wasPressedThisFrame && !_showInput)
-            {
-                _showInput = true;
-            }
-            return;
+            StopAndTranscribe();
         }
-
-        if (recordAction != null && recordAction.action.WasPressedThisFrame())
+        else 
         {
-            if (Microphone.IsRecording(_micDevice)) StopAndTranscribe();
-            else StartRecording();
-        }
-
-        // VAD Loop in session when mic is running
-        if (Microphone.IsRecording(_micDevice))
-        {
-            ProcessVAD();
+            StartRecording();
         }
     }
+    // 2. SECONDARY FEATURE: We are in the Lobby, handle scene transition!
+    else
+    {
+        Scenetransition transition = FindObjectOfType<Scenetransition>();
+        if (transition != null)
+        {
+            transition.BeginInterview();
+        }
+        else
+        {
+            Debug.LogWarning("No Scenetransition script found! Make sure the Transition Manager prefab is in this scene.");
+        }
+    }
+}
+
+        // VAD Loop in session when mic is running
+        if (Microphone.IsRecording(_micDevice))
+        {
+            ProcessVAD();
+        }
+    }
 
     // ---Real-Time Audio Analysis ---
     void ProcessVAD()

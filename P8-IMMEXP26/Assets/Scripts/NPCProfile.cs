@@ -35,6 +35,3 @@ public class NPCProfile
         return p;
     }
 }
-
-[CreateAssetMenu(fileName = "New NPC Profile", menuName = "AI/NPC Profile")]
-public class NPCProfileAsset : ScriptableObject { public NPCProfile profile; }
