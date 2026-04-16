@@ -34,11 +34,13 @@ public class Scenetransition : MonoBehaviour
         }
     }
 
-    // Called by your "Begin Interview" button's OnClick()
     public void BeginInterview()
+{
+    if (scenename != "Corescene")
     {
         StartCoroutine(FadeAndLoad());
     }
+}
 
     IEnumerator FadeAndLoad()
     {
