@@ -36,6 +36,10 @@ public class Scenetransition : MonoBehaviour
 
     public void BeginInterview()
 {
+    // 1. Ask Unity for the name of the scene we are currently in
+    string scenename = SceneManager.GetActiveScene().name;
+
+    // 2. Check if it is NOT "Corescene"
     if (scenename != "Corescene")
     {
         StartCoroutine(FadeAndLoad());
