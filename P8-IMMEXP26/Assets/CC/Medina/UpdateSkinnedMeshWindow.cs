@@ -21,7 +21,9 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 using UnityEngine;
+#if UNITY_EDITOR
 using UnityEditor;
+
 public class UpdateSkinnedMeshWindow : EditorWindow {
     [MenuItem("Window/Update Skinned Mesh Bones")]
     public static void OpenWindow()
@@ -92,3 +94,4 @@ public class UpdateSkinnedMeshWindow : EditorWindow {
         GUILayout.Label(statusContent);
     }
 }
+#endif
