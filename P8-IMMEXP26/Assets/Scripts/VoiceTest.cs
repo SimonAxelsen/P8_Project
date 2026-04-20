@@ -11,6 +11,9 @@ public class VoiceTest : MonoBehaviour
     [Tooltip("Drag the XRI Right Interaction -> Activate action here")]
     public InputActionReference recordAction;
 
+    [Header("UI")]
+    public MicIndicator micIndicator;
+
     [Header("Dev")]
     public bool useTextInput = false;
 
@@ -81,6 +84,7 @@ public class VoiceTest : MonoBehaviour
         {
             StartRecording();
         }
+        micIndicator?.Toggle();
     }
     // 2. SECONDARY FEATURE: We are in the Lobby, handle scene transition!
     else
