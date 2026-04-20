@@ -16,6 +16,7 @@ namespace Piper
 
         public string voice = "en-us";
         public int sampleRate = 22050;
+        [Range(0.9f, 1.3f)] public float lengthScale = 1.08f;
 
         private Model _runtimeModel;
         private Worker _worker; // 'IWorker' is gone, 'Worker' is the class now.
@@ -51,7 +52,7 @@ namespace Piper
                 // We create them directly with shape and data
                 using var tInput = new Tensor<int>(new TensorShape(1, inputIds.Length), inputIds);
                 using var tLength = new Tensor<int>(new TensorShape(1), new int[] { inputIds.Length });
-                using var tScales = new Tensor<float>(new TensorShape(3), new float[] { 0.667f, 1.0f, 0.8f });
+                using var tScales = new Tensor<float>(new TensorShape(3), new float[] { 0.667f, lengthScale, 0.8f });
 
                 // 5. Set Inputs
                 _worker.SetInput("input", tInput);

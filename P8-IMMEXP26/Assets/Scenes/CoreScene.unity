@@ -1451,6 +1451,7 @@ MonoBehaviour:
   modelAsset: {fileID: 5022602860645237092, guid: 84222fca50b7587438513368e0426707, type: 3}
   voice: en-us
   sampleRate: 16000
+  lengthScale: 1.08
 --- !u!4 &778233027
 Transform:
   m_ObjectHideFlags: 0
@@ -1499,6 +1500,7 @@ MonoBehaviour:
   modelAsset: {fileID: 5022602860645237092, guid: 5937e9c9d0c058d4589a1158e4fca3e9, type: 3}
   voice: en-us
   sampleRate: 16000
+  lengthScale: 1.08
 --- !u!4 &785973347
 Transform:
   m_ObjectHideFlags: 0
@@ -2238,7 +2240,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6b88e632ef755d4d8a887f234fee276, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LlmManager
-  serverUrl: ws://localhost:3001
+  serverUrl: ws://100.105.197.101:3001
   useElevenLabsAudio: 0
   elevenLabsAudioSource: {fileID: 0}
   defaultEvaluatorModel: qwen2.5:14b
@@ -2254,7 +2256,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 35b8775cea1adaa4a94b410c9c982c63, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ProsodyClient
-  pythonUrl: ws://localhost:8765
+  pythonUrl: ws://100.105.197.101:8765
   sampleRate: 16000
   frameMs: 20
 --- !u!4 &1408642648 stripped

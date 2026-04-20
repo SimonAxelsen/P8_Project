@@ -11,7 +11,8 @@ using NativeWebSocket;
 public class LlmService : MonoBehaviour
 {
     [Header("Relay Server")]
-    public string serverUrl = "ws://localhost:3001";
+    //public string serverUrl = "ws://localhost:3001";
+    public string serverUrl = "ws://100.105.197.101:3001";
 
     [Header("ElevenLabs (server TTS)")]
     [Tooltip("When true, play server ElevenLabs audio and skip local Piper for replies.")]

@@ -1870,10 +1870,10 @@ MonoBehaviour:
   m_text: 'How to communicate: Tap the VR back button, speak your answer, and tap
     it again to finish.
 
-    
 
-    Whenever you''re ready, click the VR back button
-    to start!'
+
+    Whenever you''re ready, click the VR back button to
+    start!'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -2069,8 +2069,8 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_text: "Welcome to FirstImpress! Get ready for your job interview simulation.
-    \n\nToday, you\u2019ll be sitting down with an HR Manager and a Tech Lead for
-    a hypothetical software role."
+    \n\nToday, you will be sitting down with an HR Manager and a Tech Lead for a
+    hypothetical software role."
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
