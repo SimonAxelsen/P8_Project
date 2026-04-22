@@ -25,6 +25,9 @@ public class NpcAgent : MonoBehaviour
     private AudioSource audioSource;
     private LlmService llm;
     private ConversationMemory conversationMemory;
+    private static readonly Regex FinalTtsTagOrBraceBlock = new Regex(@"\[[^\]]*\]|\{[^}]*\}", RegexOptions.Compiled);
+    private static readonly Regex FinalTtsForbiddenChars = new Regex(@"[\[\]\{\}/]", RegexOptions.Compiled);
+    private static readonly Regex MultiWhitespace = new Regex(@"\s{2,}", RegexOptions.Compiled);
 
     // --- NEW: ANIMATION VARIATION DICTIONARY ---
     // Define how many variations each trigger has. 
@@ -92,7 +95,7 @@ public class NpcAgent : MonoBehaviour
             timedTags[i] = tag;
         }
 
-        Debug.Log($"<color=cyan>[{Profile.npcName} TTS]</color> {cleanDialogue}");
+        Debug.Log($"<color=cyan>[{Profile.npcName} TTS INPUT]</color> {cleanDialogue}");
         if (conversationMemory != null) conversationMemory.StoreResponse(cleanDialogue);
         OnResponseReceived?.Invoke(cleanDialogue);
 
@@ -105,11 +108,21 @@ public class NpcAgent : MonoBehaviour
 
         if (llm != null && !llm.useElevenLabsAudio && piperManager != null)
         {
-            clip = await piperManager.TextToSpeech(cleanText);
-            if (clip != null)
+            string finalTtsText = BuildFinalTtsText(cleanText);
+
+            if (string.IsNullOrEmpty(finalTtsText))
             {
-                audioSource.clip = clip;
-                audioSource.Play();
+                Debug.LogWarning($"{name}: TTS text is empty after final symbol filtering.");
+            }
+            else
+            {
+                Debug.Log($"<color=cyan>[{Profile.npcName} TTS FINAL]</color> {finalTtsText}");
+                clip = await piperManager.TextToSpeech(finalTtsText);
+                if (clip != null)
+                {
+                    audioSource.clip = clip;
+                    audioSource.Play();
+                }
             }
         }
         else if (audioSource.clip != null)
@@ -119,6 +132,16 @@ public class NpcAgent : MonoBehaviour
 
         float duration = clip != null ? clip.length : 3.0f;
         StartCoroutine(PlayAnimationTimeline(timedTags, duration));
+    }
+
+    private string BuildFinalTtsText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+
+        string filtered = FinalTtsTagOrBraceBlock.Replace(text, " ");
+        filtered = FinalTtsForbiddenChars.Replace(filtered, " ");
+        filtered = MultiWhitespace.Replace(filtered, " ").Trim();
+        return filtered;
     }
 
     IEnumerator PlayAnimationTimeline(List<TimedTag> tags, float audioDuration)

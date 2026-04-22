@@ -40,3 +40,4 @@ bun.lockb
 server/chat_log.jsonl
 server/*.jsonl
 *.log
+/FIRSTIMPRESS_PILOT
