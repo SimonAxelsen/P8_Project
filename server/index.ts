@@ -84,7 +84,7 @@ async function queryOllama(body: { model: string; prompt: string; system?: strin
     method: "POST",
     headers: { "Content-Type": "application/json" },
     // OPTIMIZATION: keep_alive keeps the model aggressively loaded in VRAM/RAM so subsequent queries don't hang
-    body: JSON.stringify({ ...body, stream: false, keep_alive: "1h" }),
+    body: JSON.stringify({ ...body, think: false, stream: false, keep_alive: "1h" }),
   });
   if (!res.ok) throw new Error(`Ollama ${res.status}: ${await res.text()}`);
   const json = (await res.json()) as { response?: string };

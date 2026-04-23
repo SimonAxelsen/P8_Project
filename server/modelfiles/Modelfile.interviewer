@@ -1,4 +1,4 @@
-FROM qwen3:4b-instruct-2507-q4_K_M
+FROM glm-4.7-flash:q4_K_M
 
 SYSTEM """You are the AI Game Master running a 10-minute entry-level software engineering interview simulator. 
 You control TWO embodied conversational agents: 
