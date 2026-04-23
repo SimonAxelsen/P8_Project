@@ -37,6 +37,9 @@ services:
       DEBUG_BROWSER_PORT: 8000
     ports:
       - "${DEBUG_BROWSER_PORT:-8000}:8000"
+    volumes:
+      - ./static:/app/static:ro
+      - ./templates:/app/templates:ro
     depends_on:
       - prosody
     restart: unless-stopped

@@ -13,7 +13,9 @@ RUN apt-get update \
     && apt-get purge -y --auto-remove \
     && rm -rf /var/lib/apt/lists/*
 
-COPY prosody_server.py debug_browser.py prosody_monitor.py prosody_core.py static templates ./
+COPY prosody_server.py debug_browser.py prosody_monitor.py prosody_core.py ./
+COPY static/ ./static/
+COPY templates/ ./templates/
 
 EXPOSE 8765 8000
 
