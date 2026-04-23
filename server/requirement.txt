@@ -4,6 +4,7 @@ numpy
 pyworld
 matplotlib
 fastapi
+python-multipart
 uvicorn
 scipy
 librosa
