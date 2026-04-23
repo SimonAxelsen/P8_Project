@@ -40,6 +40,23 @@ latest = None
 clients = set()
 audio_cache = {"processed": None, "original": None}
 
+
+def _ensure_runtime_dirs() -> None:
+    os.makedirs(STATIC_DIR, exist_ok=True)
+    os.makedirs(TEMPLATES_DIR, exist_ok=True)
+
+
+def _template_response(name: str) -> FileResponse | HTMLResponse:
+    path = os.path.join(TEMPLATES_DIR, name)
+    if os.path.exists(path):
+        return FileResponse(path)
+    return HTMLResponse(
+        f"Missing template: {name}. Expected at {path}.",
+        status_code=503,
+    )
+
+
+_ensure_runtime_dirs()
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -175,12 +192,12 @@ def _store_audio(variant: str, y: np.ndarray, sr: int) -> str:
 
 @app.get("/")
 def root():
-    return FileResponse(os.path.join(TEMPLATES_DIR, "index.html"))
+    return _template_response("index.html")
 
 
 @app.get("/legend")
 def legend_page():
-    return FileResponse(os.path.join(TEMPLATES_DIR, "legend.html"))
+    return _template_response("legend.html")
 
 
 @app.get("/clip_audio")
