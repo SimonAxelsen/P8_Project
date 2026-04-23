@@ -16,14 +16,13 @@ function getInitialState() {
         categoryIndex: 0,
         categories: [
             "Introduction", 
-            "Judgment & prioritization", 
             "Collaboration", 
             "Accountability", 
             "Growth",
             "Wrap-up & Outro"
         ],
         // NEW: An array of scores that matches the categories above!
-        scores: [0, 0, 0, 0, 0, 0], 
+        scores: [0, 0, 0, 0, 0], 
         questionCount: 0
     };
 }
@@ -172,15 +171,20 @@ function shouldTriggerBc(st: BcState, msg: BcFeaturesMsg): BcTriggerMsg | null {
 
 // ── LLM Response Parser ─────────────────────────────────────────
 function parseLlmResponse(rawText: string) {
-  // 1. Extract the [STATE] JSON block
   let state = null;
-  const stateRegex = /\[STATE\](.*?)\[\/STATE\]/s;
-  const stateMatch = rawText.match(stateRegex);
-  
- if (stateMatch && stateMatch[1]) {
-    // 1. Scrub the LLM output! 
-    // This removes markdown ticks and extra spaces that break JSON.parse
-    let cleanJsonString = stateMatch[1]
+  let textWithoutState = rawText.trim();
+
+  // 1. NUKE SCRIPT LABELS
+  // Removes "HR:" or "TECH:" from the beginning of the text so ElevenLabs never reads it
+  textWithoutState = textWithoutState.replace(/^(?:HR|TECH|Interviewer|Assistant|System|Candidate)\s*:\s*/i, "");
+
+  // 2. ROBUST JSON EXTRACTION & COMPLETE BLOCK REMOVAL
+  // Look for the exact boundaries of the [STATE] block
+  const stateBlockRegex = /\[\s*STATE\s*\](.*?)\[\s*\/\s*STATE\s*\]/is;
+  const stateMatch = textWithoutState.match(stateBlockRegex);
+
+  if (stateMatch) {
+    let cleanJsonString = stateMatch[1] || ''
       .replace(/```json/gi, "")
       .replace(/```/g, "")
       .trim();
@@ -188,40 +192,52 @@ function parseLlmResponse(rawText: string) {
     try {
       state = JSON.parse(cleanJsonString);
     } catch (e) {
-      // 2. If it STILL fails, print the exact string to the console so we can see the hallucination!
-      console.error("⚠️ Failed to parse STATE block JSON.");
-      console.error("Here is the exact broken string the LLM generated: ->", cleanJsonString, "<-");
+      console.error("⚠️ Failed to parse STATE block JSON. Broken literal:", cleanJsonString);
+    }
+    
+    // THE FIX: Violently delete the ENTIRE block (brackets, JSON, and all) from the string
+    textWithoutState = textWithoutState.replace(stateBlockRegex, "").trim();
+  } else {
+    // Fallback: If it forgot the [STATE] tags but output JSON anyway
+    const configRegex = /\{[^{}]*?(?:"speaker"|"addProgress")[^{}]*?\}/is;
+    const configMatch = textWithoutState.match(configRegex);
+    if (configMatch) {
+      let cleanJsonString = configMatch[0].replace(/```json/gi, "").replace(/```/g, "").trim();
+      try { state = JSON.parse(cleanJsonString); } catch (e) {}
+      textWithoutState = textWithoutState.replace(configMatch[0], "").trim();
     }
   }
-  // Remove the [STATE] block from the text
-  let textWithoutState = rawText.replace(stateRegex, "").trim();
 
-  // --- NEW: THE SUBTITLE SANITIZER ---
-  // If the AI hallucinates a closing tag (with a slash), delete it so Unity never sees it.
-  textWithoutState = textWithoutState.replace(/\[\/.*?\]/g, "");
+  // Run the script label nuke one more time, just in case the AI put "HR:" AFTER the JSON block
+  textWithoutState = textWithoutState.replace(/^(?:HR|TECH|Interviewer|Assistant|System|Candidate)\s*:\s*/i, "");
 
-  // 2. Extract the inline animation tags (Now catches hyphens and numbers!)
-  const tagRegex = /\[([a-zA-Z0-9_-]+)\]/g; 
+  // Sanitize any remaining markdown or hallucinated closures
+  textWithoutState = textWithoutState
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .replace(/\[\s*\/.*?\]/g, "") 
+    .trim();
+
+  // 3. EXTRACT INLINE ANIMATION TAGS
+  const tagRegex = /\[\s*([a-zA-Z0-9_-]+)\s*\]/g; 
   const tags: string[] = [];
   let match;
   while ((match = tagRegex.exec(textWithoutState)) !== null) {
-    if (match[1]) { 
+    if (match[1] && !match[1].toUpperCase().includes("STATE")) { 
       tags.push(match[1]); 
     }
   }
 
-  // 3. THE MUZZLE: Create a clean string for TTS
-  let ttsCleanText = textWithoutState.replace(/\[.*?\]/g, ""); // Removes normal tags
-  ttsCleanText = ttsCleanText.replace(/\[.*/g, ""); // VIOLENTLY removes broken, unclosed tags at the end like [smile_pol000...
-  
-  // Strips out emojis so the TTS doesn't try to read them
+  // 4. THE MUZZLE: Create a clean string for TTS
+  let ttsCleanText = textWithoutState.replace(/\[.*?\]/g, ""); 
+  ttsCleanText = ttsCleanText.replace(/\[\s*[a-zA-Z0-9_-]*\s*$/g, ""); 
   ttsCleanText = ttsCleanText.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu, "").trim();
 
   return {
     state,              
     rawText,            
     textWithTags: textWithoutState, 
-    ttsCleanText,       // Nice, clean, emoji-free, bracket-free text!
+    ttsCleanText,       
     tags                
   };
 }
