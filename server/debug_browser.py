@@ -1,265 +1,195 @@
 import asyncio
 import json
 import os
-import websockets
-from fastapi import FastAPI, WebSocket
-from fastapi.responses import HTMLResponse
+import tempfile
+import wave
+from typing import Any
+
+import librosa
+import numpy as np
 import uvicorn
+import websockets
+from fastapi import FastAPI, File, Form, UploadFile, WebSocket, HTTPException
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+
+try:
+    from scipy.signal import butter, filtfilt
+except Exception:  # pragma: no cover
+    butter = None
+    filtfilt = None
+
+from prosody_core import (
+    ProsodyConfig,
+    analyze_audio_array,
+    compute_mel_spectrogram,
+    downsample_spectrogram,
+    float_audio_to_int16,
+    load_audio_mono_16k,
+)
 
 PROSODY_WS = os.getenv("PROSODY_WS", "ws://localhost:8765")
 DEBUG_BROWSER_HOST = os.getenv("DEBUG_BROWSER_HOST", "127.0.0.1")
 DEBUG_BROWSER_PORT = int(os.getenv("DEBUG_BROWSER_PORT", "8000"))
 
+BASE_DIR = os.path.dirname(__file__)
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
 latest = None
 clients = set()
+audio_cache = {"processed": None, "original": None}
 
 app = FastAPI()
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-HTML = r"""
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <title>Prosody Debug</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body { font-family: sans-serif; margin: 18px; }
-    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
-    .card { padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
-    .controls { min-width: 340px; max-width: 420px; }
-    .controls h3 { margin: 0 0 8px 0; }
-    .controls .btnrow { display:flex; gap:8px; flex-wrap:wrap; margin: 8px 0; }
-    button { padding: 6px 10px; cursor:pointer; }
-    label { display:block; margin: 2px 0; }
-    .small { font-size: 12px; color:#555; }
-    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .kv { display:flex; justify-content:space-between; gap:10px; }
-    .k { color:#666; }
-    .v { font-weight: 600; }
-    canvas { max-width: 1200px; }
-    code { background: #f5f5f5; padding: 2px 4px; border-radius: 4px; }
-  </style>
-</head>
-<body>
-  <h2>Prosody Debug (live)</h2>
-  <div class="row">
-    <div class="card controls">
-      <h3>Signals</h3>
-      <div class="btnrow">
-        <button id="btnAll">All on</button>
-        <button id="btnNone">All off</button>
-        <button id="btnSolo">Solo selected</button>
-      </div>
-      <div class="btnrow">
-        <button id="presetBasic">Preset: Basic</button>
-        <button id="presetVAD">Preset: VAD</button>
-        <button id="presetSpectral">Preset: Spectral</button>
-        <button id="presetPitch">Preset: Pitch</button>
-      </div>
 
-      <div class="small">Tip: click a dataset name in the chart legend to toggle it too.</div>
-      <hr/>
-      <div id="checks"></div>
-    </div>
+def _butter_filter(y: np.ndarray, sr: int, *, low: float | None, high: float | None) -> np.ndarray:
+    if butter is None or filtfilt is None:
+        if low is not None:
+            return librosa.effects.preemphasis(y, coef=0.97)
+        return y
 
-    <div class="card" style="min-width: 360px;">
-      <h3>Latest values</h3>
-      <div class="grid" id="kvGrid"></div>
-      <div class="small" style="margin-top:8px;">
-        Source: <code id="srcWs">ws://localhost:8765</code> (monitor mode) → <code id="srcHttp">http://127.0.0.1:8000</code>
-      </div>
-    </div>
-  </div>
+    nyq = 0.5 * float(sr)
+    lo = None if low is None else float(low) / nyq
+    hi = None if high is None else float(high) / nyq
 
-  <br/>
-  <canvas id="chart" width="1200" height="420"></canvas>
+    if lo is not None and lo <= 0:
+        lo = None
+    if hi is not None and hi >= 1:
+        hi = 0.99
 
-<script>
-const ws = new WebSocket("ws://" + location.host + "/ws");
-const MAX = 300;
+    if lo is None and hi is None:
+        return y
 
-// key -> label + scale for plotting
-const SIGNALS = [
-  { key: "rmsDb", label: "rmsDb", scale: 1 },
-  { key: "snrLike", label: "snrLike", scale: 1 },
-  { key: "pauseMs", label: "pauseMs", scale: 1 },
-  { key: "vad", label: "vad", scale: 1 },
+    if lo is not None and hi is not None:
+        btype = "bandpass"
+        Wn = [lo, hi]
+    elif lo is not None:
+        btype = "highpass"
+        Wn = lo
+    else:
+        btype = "lowpass"
+        Wn = hi
 
-  { key: "rms", label: "rms*100", scale: 100 },
-  { key: "noiseRms", label: "noiseRms*100", scale: 100 },
-  { key: "zcr", label: "zcr*100", scale: 100 },
+    b, a = butter(4, Wn, btype=btype)
+    return filtfilt(b, a, y).astype(np.float32)
 
-  { key: "f0Mean", label: "f0Mean", scale: 1 },
-  { key: "f0Slope", label: "f0Slope", scale: 1 },
-  { key: "voicedRatio", label: "voicedRatio*300", scale: 300 },
 
-  { key: "specCentroid", label: "specCentroid/100", scale: 0.01 },
-  { key: "specRolloff", label: "specRolloff/100", scale: 0.01 },
-  { key: "specFlatness", label: "specFlatness*50", scale: 50 },
-  { key: "specFlux", label: "specFlux", scale: 1 },
-  { key: "bandEnergyRatio", label: "bandEnergyRatio*100", scale: 100 },
+def apply_filters(y: np.ndarray, sr: int, filters: list[str]) -> np.ndarray:
+    if y is None or y.size == 0:
+        return y
 
-  { key: "mfcc0", label: "mfcc0", scale: 1 },
-  { key: "mfcc1", label: "mfcc1", scale: 1 },
-  { key: "mfcc2", label: "mfcc2", scale: 1 },
-  { key: "mfccDelta0", label: "mfccDelta0", scale: 1 },
-];
+    out = np.asarray(y, dtype=np.float32)
+    out = np.clip(out, -1.0, 1.0)
 
-const labels = [];
-const series = Object.fromEntries(SIGNALS.map(s => [s.key, []]));
-const enabled = Object.fromEntries(SIGNALS.map(s => [s.key, true]));
+    if "noise" in filters:
+        stft = librosa.stft(out)
+        mag = np.abs(stft)
+        phase = stft / np.maximum(mag, 1e-9)
+        noise_profile = np.median(mag, axis=1, keepdims=True)
+        mask = mag >= (noise_profile * 1.5)
+        mag_d = mag * mask
+        out = librosa.istft(mag_d * phase, length=out.shape[0])
 
-const checksDiv = document.getElementById("checks");
-function rebuildChecks() {
-  checksDiv.innerHTML = "";
-  SIGNALS.forEach(s => {
-    const id = "chk_" + s.key;
-    const lab = document.createElement("label");
-    lab.innerHTML = `<input type="checkbox" id="${id}" ${enabled[s.key] ? "checked" : ""}/> ${s.label}`;
-    checksDiv.appendChild(lab);
-    document.getElementById(id).addEventListener("change", (e) => {
-      enabled[s.key] = e.target.checked;
-      setDatasetVisible(s.key, enabled[s.key]);
-    });
-  });
-}
+    if "highpass" in filters:
+        out = _butter_filter(out, sr, low=80.0, high=None)
 
-function setDatasetVisible(key, isVisible) {
-  const idx = chart.data.datasets.findIndex(d => d._key === key);
-  if (idx >= 0) {
-    chart.setDatasetVisibility(idx, isVisible);
-    chart.update("none");
-  }
-}
+    if "bandpass" in filters:
+        out = _butter_filter(out, sr, low=80.0, high=4000.0)
 
-function setAll(on) {
-  SIGNALS.forEach(s => {
-    enabled[s.key] = on;
-    setDatasetVisible(s.key, on);
-    const cb = document.getElementById("chk_" + s.key);
-    if (cb) cb.checked = on;
-  });
-}
+    if "normalize" in filters:
+        rms = float(np.sqrt(np.mean(out * out) + 1e-12))
+        target = 0.1
+        out = out * (target / max(rms, 1e-6))
 
-function soloSelected() {
-  const selected = SIGNALS.filter(s => document.getElementById("chk_" + s.key)?.checked);
-  if (selected.length === 0) return;
-  setAll(false);
-  selected.forEach(s => {
-    enabled[s.key] = true;
-    setDatasetVisible(s.key, true);
-    const cb = document.getElementById("chk_" + s.key);
-    if (cb) cb.checked = true;
-  });
-}
+    if "preemphasis" in filters:
+        out = librosa.effects.preemphasis(out, coef=0.97)
 
-function applyPreset(keysOn) {
-  setAll(false);
-  keysOn.forEach(k => {
-    enabled[k] = true;
-    setDatasetVisible(k, true);
-    const cb = document.getElementById("chk_" + k);
-    if (cb) cb.checked = true;
-  });
-}
+    if "distortion" in filters:
+        drive = 2.5
+        out = np.tanh(out * drive)
 
-document.getElementById("btnAll").onclick = () => setAll(true);
-document.getElementById("btnNone").onclick = () => setAll(false);
-document.getElementById("btnSolo").onclick = () => soloSelected();
+    if "tremolo" in filters:
+        rate_hz = 5.0
+        depth = 0.6
+        t = np.arange(out.shape[0], dtype=np.float32) / float(sr)
+        mod = 1.0 - depth + depth * (0.5 * (1.0 + np.sin(2 * np.pi * rate_hz * t)))
+        out = out * mod
 
-document.getElementById("presetBasic").onclick = () =>
-  applyPreset(["rmsDb","snrLike","pauseMs","vad","f0Mean","voicedRatio"]);
+    if "sawtooth" in filters:
+        rate_hz = 4.0
+        depth = 0.5
+        t = np.arange(out.shape[0], dtype=np.float32) / float(sr)
+        phase = (t * rate_hz) % 1.0
+        wave = 2.0 * phase - 1.0
+        mod = 1.0 - depth + depth * ((wave + 1.0) / 2.0)
+        out = out * mod
 
-document.getElementById("presetVAD").onclick = () =>
-  applyPreset(["rms","noiseRms","snrLike","vad","pauseMs","speechMs"]);
+    if "ringmod" in filters:
+        rate_hz = 35.0
+        depth = 0.7
+        t = np.arange(out.shape[0], dtype=np.float32) / float(sr)
+        carrier = np.sin(2 * np.pi * rate_hz * t)
+        out = out * (1.0 - depth + depth * carrier)
 
-document.getElementById("presetSpectral").onclick = () =>
-  applyPreset(["specFlatness","specFlux","bandEnergyRatio","specCentroid","specRolloff"]);
+    if "bitcrush" in filters:
+        bits = 6
+        levels = float(2 ** bits)
+        out = np.round(out * levels) / levels
 
-document.getElementById("presetPitch").onclick = () =>
-  applyPreset(["f0Mean","f0Slope","voicedRatio","rmsDb","pauseMs"]);
+    if "echo" in filters:
+        delay_sec = 0.18
+        decay = 0.45
+        delay = int(delay_sec * sr)
+        if delay > 0:
+            wet = np.zeros_like(out)
+            wet[delay:] = out[:-delay]
+            out = np.clip(out + (wet * decay), -1.0, 1.0)
 
-const kvGrid = document.getElementById("kvGrid");
-function setKV(key, val) {
-  let el = document.getElementById("kv_" + key);
-  if (!el) {
-    const row = document.createElement("div");
-    row.className = "kv";
-    row.id = "kv_" + key;
-    row.innerHTML = `<span class="k">${key}</span><span class="v" id="kvv_${key}">-</span>`;
-    kvGrid.appendChild(row);
-    el = row;
-  }
-  const vv = document.getElementById("kvv_" + key);
-  if (vv) vv.textContent = val;
-}
+    return np.clip(out, -1.0, 1.0)
 
-const datasets = SIGNALS.map(s => ({
-  label: s.label,
-  data: series[s.key],
-  _key: s.key,
-}));
 
-const chart = new Chart(document.getElementById("chart"), {
-  type: "line",
-  data: { labels, datasets },
-  options: {
-    animation: false,
-    responsive: true,
-    interaction: { mode: "nearest", intersect: false },
-    scales: { x: { display: false } },
-    plugins: { legend: { display: true } }
-  }
-});
+def _write_wav(path: str, y: np.ndarray, sr: int) -> None:
+    x = float_audio_to_int16(y)
+    with wave.open(path, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(x.tobytes())
 
-rebuildChecks();
 
-function push(arr, v) { arr.push(v); if (arr.length > MAX) arr.shift(); }
+def _store_audio(variant: str, y: np.ndarray, sr: int) -> str:
+    prev = audio_cache.get(variant)
+    if prev:
+        try:
+            os.unlink(prev)
+        except Exception:
+            pass
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+    tmp.close()
+    _write_wav(tmp.name, y, sr)
+    audio_cache[variant] = tmp.name
+    return tmp.name
 
-ws.onmessage = (e) => {
-  const d = JSON.parse(e.data);
-  if (!d || d.type !== "prosody_features") return;
-
-  const keysToShow = ["vad","pauseMs","speechMs","rms","rmsDb","noiseRms","snrLike","zcr",
-                      "f0Mean","f0Slope","voicedRatio",
-                      "specCentroid","specRolloff","specFlatness","specFlux","bandEnergyRatio",
-                      "mfcc0","mfcc1","mfcc2","mfccDelta0"];
-  keysToShow.forEach(k => {
-    if (d[k] !== undefined) {
-      const val = (typeof d[k] === "number")
-        ? d[k].toFixed((k==="vad")?0 : (k.includes("Ms")?0 : (k.startsWith("mfcc")?2 : (k==="rms"?4:2))))
-        : String(d[k]);
-      setKV(k, val);
-    }
-  });
-
-  labels.push(Date.now()); if (labels.length > MAX) labels.shift();
-
-  SIGNALS.forEach(s => {
-    const raw = d[s.key];
-    if (raw === undefined || raw === null) return;
-    push(series[s.key], raw * s.scale);
-  });
-
-  SIGNALS.forEach(s => {
-    if (series[s.key].length < labels.length) {
-      const last = series[s.key].length ? series[s.key][series[s.key].length - 1] : 0;
-      push(series[s.key], last);
-    }
-  });
-
-  chart.update("none");
-};
-
-applyPreset(["rmsDb","snrLike","pauseMs","vad","f0Mean","voicedRatio"]);
-</script>
-</body>
-</html>
-"""
 
 @app.get("/")
 def root():
-    return HTMLResponse(HTML)
+    return FileResponse(os.path.join(TEMPLATES_DIR, "index.html"))
+
+
+@app.get("/legend")
+def legend_page():
+    return FileResponse(os.path.join(TEMPLATES_DIR, "legend.html"))
+
+
+@app.get("/clip_audio")
+def clip_audio(variant: str = "processed"):
+    path = audio_cache.get(variant)
+    if not path or not os.path.exists(path):
+        return HTMLResponse("No audio available", status_code=404)
+    return FileResponse(path, media_type="audio/wav")
+
 
 @app.websocket("/ws")
 async def ws_clients(ws: WebSocket):
@@ -272,6 +202,95 @@ async def ws_clients(ws: WebSocket):
             await asyncio.sleep(10)
     finally:
         clients.discard(ws)
+
+
+@app.post("/analyze_clip")
+async def analyze_clip(file: UploadFile = File(...), filters: str | None = Form(None)):
+    data = await file.read()
+    max_bytes = 50 * 1024 * 1024
+    if len(data) > max_bytes:
+        raise HTTPException(status_code=413, detail="File too large (max 50MB)")
+    suffix = os.path.splitext(file.filename or "")[1].lower() or ".wav"
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(data)
+        tmp_path = tmp.name
+
+    try:
+        cfg = ProsodyConfig()
+        y = load_audio_mono_16k(tmp_path, sr=cfg.sr)
+
+        allowed_filters = {
+            "noise",
+            "highpass",
+            "bandpass",
+            "normalize",
+            "preemphasis",
+            "distortion",
+            "tremolo",
+            "sawtooth",
+            "ringmod",
+            "bitcrush",
+            "echo",
+        }
+        filter_list: list[str] = []
+        if filters:
+            try:
+                parsed = json.loads(filters)
+                if isinstance(parsed, list):
+                    filter_list = [f for f in parsed if isinstance(f, str) and f in allowed_filters]
+            except Exception:
+                filter_list = []
+
+        y_filtered = apply_filters(y, cfg.sr, filter_list)
+        _store_audio("original", y, cfg.sr)
+        _store_audio("processed", y_filtered, cfg.sr)
+
+        result: dict[str, Any] = analyze_audio_array(y_filtered, config=cfg, include_features=True)
+
+        mel_db = compute_mel_spectrogram(
+            y_filtered,
+            cfg.sr,
+            n_fft=cfg.n_fft,
+            hop=cfg.hop,
+            win=cfg.win,
+            n_mels=cfg.mel_n_mels,
+            fmin=cfg.mel_fmin,
+            fmax=cfg.mel_fmax,
+        )
+        mel_ds, _ = downsample_spectrogram(mel_db, cfg.mel_max_frames)
+        hop_sec = float(cfg.hop) / float(cfg.sr)
+        if mel_db.shape[1] > 0 and mel_ds.shape[1] > 0:
+            hop_sec = hop_sec * (float(mel_db.shape[1]) / float(mel_ds.shape[1]))
+        result["melSpectrogram"] = mel_ds.tolist()
+        result["melFrameHopSec"] = hop_sec
+
+        original = analyze_audio_array(y, config=cfg, include_features=True)
+        mel_db_raw = compute_mel_spectrogram(
+            y,
+            cfg.sr,
+            n_fft=cfg.n_fft,
+            hop=cfg.hop,
+            win=cfg.win,
+            n_mels=cfg.mel_n_mels,
+            fmin=cfg.mel_fmin,
+            fmax=cfg.mel_fmax,
+        )
+        mel_ds_raw, _ = downsample_spectrogram(mel_db_raw, cfg.mel_max_frames)
+        hop_sec_raw = float(cfg.hop) / float(cfg.sr)
+        if mel_db_raw.shape[1] > 0 and mel_ds_raw.shape[1] > 0:
+            hop_sec_raw = hop_sec_raw * (float(mel_db_raw.shape[1]) / float(mel_ds_raw.shape[1]))
+        original["melSpectrogram"] = mel_ds_raw.tolist()
+        original["melFrameHopSec"] = hop_sec_raw
+        result["original"] = original
+
+        return result
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
 
 async def prosody_listener():
     global latest
@@ -299,9 +318,11 @@ async def prosody_listener():
         except Exception:
             await asyncio.sleep(1)
 
+
 @app.on_event("startup")
 async def _startup():
     asyncio.create_task(prosody_listener())
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host=DEBUG_BROWSER_HOST, port=DEBUG_BROWSER_PORT)

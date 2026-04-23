@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Prosody Legend</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/legend.css"/>
+  <script defer src="/static/legend.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <h1>Legend and interpretation guide</h1>
+      <p>Use these notes to read trends, not absolute thresholds.</p>
+    </div>
+    <div class="actions">
+      <button class="btn" id="themeToggle" type="button">Dark mode</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>How to read the dashboard</h2>
+    <p class="muted">Most signals are most reliable when you compare them over time. A sudden change is often more important than a single value. For clips, the highlighted window shows the current time focus.</p>
+    <div class="pill-row">
+      <span class="pill">Energy rises = louder or more active</span>
+      <span class="pill">Pitch rises = higher f0Mean</span>
+      <span class="pill">Boundary spikes = likely phrase breaks</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Energy and activity</h2>
+    <div class="legend-grid">
+      <div class="legend-item"><h4>rmsDb</h4><p>Signal energy in decibels. Higher values usually mean louder or stronger signal.</p></div>
+      <div class="legend-item"><h4>rms</h4><p>Root-mean-square amplitude. Higher means more energy in the signal window.</p></div>
+      <div class="legend-item"><h4>noiseRms</h4><p>Estimated background noise floor. If this rises, the environment is noisier.</p></div>
+      <div class="legend-item"><h4>snrLike</h4><p>Approximate signal-to-noise ratio. Higher means the signal stands out more clearly.</p></div>
+      <div class="legend-item"><h4>vad</h4><p>Voice activity state, usually <code>0</code> or <code>1</code>. <code>1</code> means above the activity threshold.</p></div>
+      <div class="legend-item"><h4>pauseMs</h4><p>Time since recent activity in milliseconds. Higher values indicate longer pauses.</p></div>
+      <div class="legend-item"><h4>speechMs</h4><p>Duration of the current active region in milliseconds.</p></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Pitch and voicing</h2>
+    <div class="legend-grid">
+      <div class="legend-item"><h4>f0Mean</h4><p>Estimated fundamental frequency. Higher values indicate higher pitch.</p></div>
+      <div class="legend-item"><h4>f0Slope</h4><p>Pitch trend over time. Positive values mean rising pitch, negative values mean falling pitch.</p></div>
+      <div class="legend-item"><h4>voicedRatio</h4><p>How much of the current window appears voiced or periodic.</p></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Spectral shape</h2>
+    <div class="legend-grid">
+      <div class="legend-item"><h4>zcr</h4><p>Zero-crossing rate. Higher values often mean noisier or higher-frequency content.</p></div>
+      <div class="legend-item"><h4>specCentroid</h4><p>Spectral brightness. Higher values mean brighter sound.</p></div>
+      <div class="legend-item"><h4>specRolloff</h4><p>Frequency below which most spectral energy lies.</p></div>
+      <div class="legend-item"><h4>specFlatness</h4><p>How noise-like the spectrum is. Higher values suggest flatter spectra.</p></div>
+      <div class="legend-item"><h4>specFlux</h4><p>How quickly the spectrum changes.</p></div>
+      <div class="legend-item"><h4>lowEnergyRatio</h4><p>Amount of energy in the low-frequency band.</p></div>
+      <div class="legend-item"><h4>speechEnergyRatio</h4><p>Energy in the speech-focused band.</p></div>
+      <div class="legend-item"><h4>highEnergyRatio</h4><p>Energy in the upper frequency band.</p></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Confidence and prosody</h2>
+    <div class="legend-grid">
+      <div class="legend-item"><h4>speechConfidence</h4><p>Heuristic score for how speech-like the current signal appears.</p></div>
+      <div class="legend-item"><h4>speechLike</h4><p>Binary decision derived from <code>speechConfidence</code>.</p></div>
+      <div class="legend-item"><h4>boundaryConfidence</h4><p>Likelihood of a phrase or segment boundary.</p></div>
+      <div class="legend-item"><h4>speechEnergySlope</h4><p>Trend of speech-band energy. Negative means falling energy.</p></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>MFCC</h2>
+    <div class="legend-grid">
+      <div class="legend-item"><h4>mfcc0, mfcc1, mfcc2</h4><p>Compact descriptors of spectral shape. Best for comparing regions.</p></div>
+      <div class="legend-item"><h4>mfccDelta0</h4><p>Rate of change of the first MFCC term.</p></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Segments</h2>
+    <p><strong>voiced</strong>: active and periodic content.</p>
+    <p><strong>pause</strong>: low activity or inactive region.</p>
+    <p><strong>boundary</strong>: likely transition point based on the current boundary heuristic.</p>
+  </div>
+</div>
+</body>
+</html>

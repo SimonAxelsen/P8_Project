@@ -1,0 +1,67 @@
+const state = {
+  ws: null,
+  wsScheme: location.protocol === "https:" ? "wss://" : "ws://",
+  wsUrl: null,
+  prosodyWs: null,
+  micSocket: null,
+  micStream: null,
+  micCtx: null,
+  micProcessor: null,
+  micBuffer: [],
+  micBufferSamples: 0,
+  micUseDisplaySocket: false,
+
+  micStatusEl: document.getElementById("micStatus"),
+  modeChipEl: document.getElementById("modeChip"),
+  themeToggle: document.getElementById("themeToggle"),
+  uploadStatusEl: document.getElementById("uploadStatus"),
+  sourceValueEl: document.getElementById("sourceValue"),
+
+  clipSpec: document.getElementById("clipSpectrogram"),
+  clipSpecOverview: document.getElementById("clipSpectrogramOverview"),
+  clipWaveform: document.getElementById("clipWaveform"),
+  liveSpec: document.getElementById("liveSpectrogram"),
+  heatmap: document.getElementById("prosodyHeatmap"),
+
+  clipSpecCtx: null,
+  clipSpecOverviewCtx: null,
+  clipWaveformCtx: null,
+  liveSpecCtx: null,
+  heatmapCtx: null,
+
+  baselineStats: null,
+  baselineNormalize: document.getElementById("baselineNormalize"),
+  baselineStatus: document.getElementById("baselineStatus"),
+  baselineCalibrateBtn: document.getElementById("baselineCalibrateBtn"),
+  baselineClearBtn: document.getElementById("baselineClearBtn"),
+  clipFeatures: [],
+  clipSegments: [],
+  clipBoundaries: [],
+  clipDuration: 0,
+  clipMel: null,
+  clipFrameHopSec: 0.01,
+  clipOriginal: null,
+  clipOriginalMeta: null,
+  showOriginal: false,
+  activeClipVariant: "processed",
+  overlayMode: false,
+  lastFilterPayload: null,
+
+  currentMode: "live",
+  liveFrames: [],
+  liveSpecCols: [],
+  liveMelBins: null,
+  liveMelTimes: [],
+  liveBufferSec: 60,
+  clipWindowSec: 5.0,
+  liveMax: 300,
+
+  draggingOverview: false,
+  graphs: null,
+  graphConfigs: null,
+  pendingTheme: null,
+};
+
+const MIC_SR_TARGET = 16000;
+const MIC_FRAME_MS = 20;
+const MIC_FRAME_SAMPLES = Math.floor(MIC_SR_TARGET * MIC_FRAME_MS / 1000);

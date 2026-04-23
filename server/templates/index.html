@@ -1,0 +1,262 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Prosody Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/static/app.css"/>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 12C6.5 7.5 9.5 7.5 12 12C14.5 16.5 17.5 16.5 20 12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <path d="M6 16C8.2 13 9.8 13 12 16C14.2 19 15.8 19 18 16" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Prosody Monitor</h1>
+          <p>Live and clip analysis with timeline focus, spectrograms, and explanations.</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span class="chip" id="modeChip">Mode: live</span>
+        <span class="chip">Source: <span id="sourceValue">ws://localhost:8765</span></span>
+        <button class="btn btn-ghost" id="themeToggle" type="button">Dark mode</button>
+        <a class="btn btn-secondary" href="/legend" target="_blank">Open legend</a>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="dock">
+        <div class="card controls view-toggle">
+          <h3>Analyze audio clip</h3>
+          <input type="file" id="audioFile" accept=".wav,.mp3,.m4a,.ogg,.flac"/>
+          <div class="small" style="margin-top:8px;">Filters (clip only)</div>
+          <div class="signal-list filter-list" id="filterList">
+            <label><input type="checkbox" data-filter="noise"/>Noise suppression</label>
+            <label><input type="checkbox" data-filter="highpass"/>High-pass (80 Hz)</label>
+            <label><input type="checkbox" data-filter="lowpass"/>Low-pass (4 kHz)</label>
+            <label><input type="checkbox" data-filter="bandpass"/>Band-pass (80-4000 Hz)</label>
+            <label><input type="checkbox" data-filter="normalize"/>Normalize RMS</label>
+            <label><input type="checkbox" data-filter="preemphasis"/>Pre-emphasis</label>
+            <label><input type="checkbox" data-filter="distortion"/>Drive / distortion</label>
+            <label><input type="checkbox" data-filter="tremolo"/>Tremolo (volume mod)</label>
+            <label><input type="checkbox" data-filter="sawtooth"/>Sawtooth mod</label>
+            <label><input type="checkbox" data-filter="ringmod"/>Ring mod</label>
+            <label><input type="checkbox" data-filter="bitcrush"/>Bitcrush</label>
+            <label><input type="checkbox" data-filter="echo"/>Echo</label>
+          </div>
+          <div class="btnrow">
+            <button id="uploadBtn" class="btn btn-primary">Process clip</button>
+          </div>
+          <audio id="player" controls></audio>
+          <div class="small" id="uploadStatus">No file uploaded.</div>
+          <div class="segment-badge" id="currentSegment">
+            <span class="segment-label">Current segment</span>
+            <span class="segment-arrows" aria-hidden="true">⇄</span>
+            <span class="segment-value">none</span>
+          </div>
+          <div class="summary" id="clipSummary"></div>
+          <div class="small" style="margin-top:8px;">Boundaries</div>
+          <div class="boundary-list" id="boundaryList"></div>
+        </div>
+
+        <div class="card controls">
+          <h3>Baseline calibration</h3>
+          <div class="btnrow">
+            <button id="baselineCalibrateBtn" class="btn btn-secondary">Calibrate from clip</button>
+            <button id="baselineClearBtn" class="btn btn-ghost">Clear baseline</button>
+          </div>
+          <label class="small" style="display:flex; gap:8px; align-items:center;">
+            <input type="checkbox" id="baselineNormalize" /> Normalize graphs by baseline (z-score, no scaling)
+          </label>
+          <div class="small" id="baselineStatus">No baseline captured.</div>
+        </div>
+
+        <div class="card controls">
+          <h3>Mic mode</h3>
+          <div class="btnrow">
+            <button id="micStartBtn" class="btn btn-primary">Start mic stream</button>
+            <button id="micStopBtn" class="btn btn-danger" disabled>Stop mic</button>
+          </div>
+          <div class="small" id="micStatus">Mic idle.</div>
+          <div class="score-grid">
+            <div class="score-card score-low" id="scoreTurnEnd">
+              <div class="score-label">Turn end</div>
+              <div class="score-val" id="scoreTurnEndVal">-</div>
+            </div>
+            <div class="score-card score-low" id="scoreQuestion">
+              <div class="score-label">Question</div>
+              <div class="score-val" id="scoreQuestionVal">-</div>
+            </div>
+            <div class="score-card score-low" id="scoreEngagement">
+              <div class="score-label">Engagement</div>
+              <div class="score-val" id="scoreEngagementVal">-</div>
+            </div>
+          </div>
+          <div class="score-legend">
+            Turn end: pause length + energy fall + pitch fall. Question: rising pitch + short pause.
+            Engagement: energy + spectral flux + brightness.
+          </div>
+        </div>
+
+        <div class="card controls">
+          <h3>Window</h3>
+          <div class="btnrow">
+            <label for="windowSizeSelect" class="small">Window size</label>
+            <select id="windowSizeSelect">
+              <option value="2">2 sec</option>
+              <option value="5" selected>5 sec</option>
+              <option value="8">8 sec</option>
+              <option value="10">10 sec</option>
+            </select>
+          </div>
+          <div class="small">
+            The selected window controls the highlighted range and the detailed graphs during clip playback.
+          </div>
+        </div>
+
+        <div class="card controls">
+          <h3>Mode</h3>
+          <div class="btnrow">
+            <button id="liveModeBtn" class="btn btn-secondary">Switch to live mode</button>
+          </div>
+          <div class="small">
+            In clip mode, each graph shows a full overview plus a highlighted time window.
+          </div>
+        </div>
+      </aside>
+
+      <section class="analysis">
+        <div class="card controls view-toggle">
+          <h3>Clip view</h3>
+          <div class="btnrow">
+            <button id="viewProcessedBtn" class="btn btn-primary">Processed view</button>
+            <button id="viewOriginalBtn" class="btn btn-secondary">Original view</button>
+            <label class="small" style="display:flex; gap:8px; align-items:center;">
+              <input type="checkbox" id="overlayToggle" /> Overlay original + processed
+            </label>
+          </div>
+          <div class="small">Switch between original/processed or overlay them in the graphs.</div>
+        </div>
+
+        <div class="panel-grid">
+          <div class="card spectro-card">
+            <h3>Clip spectrogram (mel)</h3>
+            <div class="small">Windowed view follows the clip window size.</div>
+            <canvas id="clipSpectrogram" width="320" height="120"></canvas>
+            <div class="small" style="margin-top:6px;">Full overview</div>
+            <canvas id="clipSpectrogramOverview" class="spectro-overview" width="320" height="60"></canvas>
+            <div class="small" id="spectrogramStatus">Upload a clip to render.</div>
+          </div>
+
+          <div class="card spectro-card">
+            <h3>Live spectrogram (mel)</h3>
+            <div class="small">Live mel frames from websocket.</div>
+            <canvas id="liveSpectrogram" width="320" height="120"></canvas>
+            <div class="small" style="margin-top:10px;">Waveform (live window)</div>
+            <canvas id="clipWaveform" class="waveform-canvas" width="320" height="80"></canvas>
+          </div>
+        </div>
+
+        <div class="graphs-grid">
+          <div class="card graph-card">
+            <h3>Graph A - energy and voicing</h3>
+            <p class="graph-desc">Use this view to track loudness, SNR, and voicing changes.</p>
+            <div class="graph-toolbar">
+              <button data-graph="g1" class="btn btn-chip allOnBtn">All on</button>
+              <button data-graph="g1" class="btn btn-chip allOffBtn">All off</button>
+            </div>
+            <div class="signal-list" id="signals_g1"></div>
+            <div class="overview-wrap">
+              <canvas id="overview_g1"></canvas>
+              <div class="window-box" id="box_g1"></div>
+            </div>
+            <div class="detail-wrap">
+              <canvas id="detail_g1"></canvas>
+            </div>
+            <div class="chart-legend" id="legend_g1"></div>
+          </div>
+
+          <div class="card graph-card">
+            <h3>Graph B - spectral and confidence</h3>
+            <p class="graph-desc">Spectral shape, speech confidence, and boundary signals.</p>
+            <div class="graph-toolbar">
+              <button data-graph="g2" class="btn btn-chip allOnBtn">All on</button>
+              <button data-graph="g2" class="btn btn-chip allOffBtn">All off</button>
+            </div>
+            <div class="signal-list" id="signals_g2"></div>
+            <div class="overview-wrap">
+              <canvas id="overview_g2"></canvas>
+              <div class="window-box" id="box_g2"></div>
+            </div>
+            <div class="detail-wrap">
+              <canvas id="detail_g2"></canvas>
+            </div>
+            <div class="chart-legend" id="legend_g2"></div>
+          </div>
+        </div>
+
+      </section>
+
+      <aside class="insights">
+        <div class="card heatmap-card heatmap-vertical">
+          <h3>Prosody heatmap</h3>
+          <canvas id="prosodyHeatmap" class="heatmap-canvas" width="320" height="220"></canvas>
+          <div class="heatmap-legend">
+            <span><span class="heatmap-dot dot-f0"></span>Pitch (F0 mean)</span>
+            <span><span class="heatmap-dot dot-energy"></span>Energy (RMS dB)</span>
+            <span><span class="heatmap-dot dot-boundary"></span>Boundary confidence</span>
+          </div>
+        </div>
+        <div class="card info-card">
+          <h3>Interpretation quick guide</h3>
+          <div class="info-grid">
+            <div>
+              <strong>Energy and activity</strong>
+              <p>RMS dB and SNR-like show loudness and clarity. VAD = activity on or off.</p>
+            </div>
+            <div>
+              <strong>Pitch and voicing</strong>
+              <p>F0 mean tracks pitch; voiced ratio tracks how tonal the signal is.</p>
+            </div>
+            <div>
+              <strong>Boundaries</strong>
+              <p>Boundary confidence spikes indicate likely phrase breaks or transitions.</p>
+            </div>
+          </div>
+          <div class="small" style="margin-top:8px;">Open the full legend for deeper explanations.</div>
+        </div>
+
+        <div class="card">
+          <h3>Latest values</h3>
+          <div class="kv-grid" id="kvGrid"></div>
+          <div class="small" style="margin-top:8px;">
+            Source: <code>ws://localhost:8765</code> monitor mode -> <code>http://127.0.0.1:8000</code>
+          </div>
+        </div>
+
+      </aside>
+    </div>
+  </div>
+
+  <script src="/static/app_state.js"></script>
+  <script src="/static/app_utils.js"></script>
+  <script src="/static/app_spectrogram.js"></script>
+  <script src="/static/app_values.js"></script>
+  <script src="/static/app_heatmap.js"></script>
+  <script src="/static/app_overview.js"></script>
+  <script src="/static/app_charts.js"></script>
+  <script src="/static/app_mic.js"></script>
+  <script src="/static/app_live.js"></script>
+  <script src="/static/app_clip.js"></script>
+  <script src="/static/app_init.js"></script>
+</body>
+</html>
