@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NPCProfileAsset
   profile:
     npcName: TECH
-    modelName: interviewee_2:latest
+    modelName: interviewee_2_glm:latest
     systemPrompt: 
     contextPrompt: 
     personalityTraits: 
