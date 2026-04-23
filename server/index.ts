@@ -41,10 +41,23 @@ type ConversationMemory = {
   maxExchanges: number;
 };
 
+type SessionScratchpad = {
+  candidateName?: string;
+  currentTopic: string;
+  lastMeaningfulExample?: string;
+  openFollowUp?: string;
+};
+
 function getInitialMemory(): ConversationMemory {
   return {
     exchanges: [],
-    maxExchanges: 4  // Keep last 4 exchanges for context
+    maxExchanges: 5
+  };
+}
+
+function getInitialScratchpad(): SessionScratchpad {
+  return {
+    currentTopic: "Introduction",
   };
 }
 
@@ -67,6 +80,157 @@ function getContextForPrompt(memory: ConversationMemory): string {
   });
   context += "[/CONVERSATION HISTORY]\n\n";
   return context;
+}
+
+function normalizeMemoryText(text: string, maxLength = 220): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 3).trim()}...`;
+}
+
+function wordCount(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function normalizeForComparison(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenizeForSimilarity(text: string): string[] {
+  const stopwords = new Set([
+    "a", "an", "and", "are", "can", "could", "do", "for", "from", "have", "how", "i",
+    "if", "im", "is", "it", "let", "like", "me", "my", "of", "on", "or", "please",
+    "so", "that", "the", "this", "to", "we", "what", "when", "with", "would", "you",
+    "your",
+  ]);
+
+  return normalizeForComparison(text)
+    .split(" ")
+    .filter((token) => token.length > 2 && !stopwords.has(token));
+}
+
+function extractCandidateName(text: string): string | undefined {
+  const patterns = [
+    /\bmy name is\s+([a-z][a-z' -]{1,30})/i,
+    /\bcall me\s+([a-z][a-z' -]{1,30})/i,
+    /\bthis is\s+([a-z][a-z' -]{1,30})/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    const rawName = match?.[1]?.trim();
+    if (!rawName) continue;
+
+    const words = rawName
+      .replace(/[.,!?;:]+$/g, "")
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (words.length === 0 || words.length > 3) continue;
+    if (!words.every((word) => /^[a-z][a-z'’-]*$/i.test(word))) continue;
+
+    return words
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  }
+
+  return undefined;
+}
+
+function isShortGreeting(text: string): boolean {
+  const normalized = normalizeForComparison(text);
+  const words = wordCount(normalized);
+  if (words > 8) return false;
+
+  return /^(hi|hello|hey|good morning|good afternoon|good evening|how are you|nice to meet you)\b/.test(normalized);
+}
+
+function isClarificationRequest(text: string): boolean {
+  const normalized = normalizeForComparison(text);
+
+  return /(can you repeat|could you repeat|repeat the question|say that again|clarify|please clarify|what do you mean|can you explain|didn t catch|pardon|sorry can you repeat|sorry can you clarify)/.test(normalized);
+}
+
+function isEchoOfPreviousQuestion(userText: string, previousAssistantText?: string): boolean {
+  if (!previousAssistantText) return false;
+
+  const userTokens = tokenizeForSimilarity(userText);
+  const assistantTokens = tokenizeForSimilarity(previousAssistantText);
+
+  if (userTokens.length < 4 || assistantTokens.length < 4) return false;
+
+  const assistantTokenSet = new Set(assistantTokens);
+  const overlap = userTokens.filter((token) => assistantTokenSet.has(token)).length;
+  const overlapRatio = overlap / userTokens.length;
+
+  return overlapRatio >= 0.7;
+}
+
+function shouldStoreMeaningfulTurn(userText: string, previousAssistantText?: string): boolean {
+  const normalized = normalizeMemoryText(userText, 400);
+  if (!normalized) return false;
+  if (wordCount(normalized) < 4) return false;
+  if (isShortGreeting(normalized)) return false;
+  if (isClarificationRequest(normalized)) return false;
+  if (isEchoOfPreviousQuestion(normalized, previousAssistantText)) return false;
+  return true;
+}
+
+function extractOpenFollowUp(text: string): string | undefined {
+  const normalized = normalizeMemoryText(text, 220);
+  const questionMatches = normalized.match(/[^?]*\?/g);
+  if (!questionMatches || questionMatches.length === 0) return undefined;
+  return questionMatches[questionMatches.length - 1]?.trim();
+}
+
+function getScratchpadContext(scratchpad: SessionScratchpad): string {
+  const lines = ["[SESSION SUMMARY]"];
+
+  lines.push(`Current topic: ${scratchpad.currentTopic}`);
+
+  if (scratchpad.candidateName) {
+    lines.push(`Candidate name: ${scratchpad.candidateName}`);
+  }
+  if (scratchpad.lastMeaningfulExample) {
+    lines.push(`Last meaningful example: ${scratchpad.lastMeaningfulExample}`);
+  }
+  if (scratchpad.openFollowUp) {
+    lines.push(`Open follow-up: ${scratchpad.openFollowUp}`);
+  }
+
+  lines.push("[/SESSION SUMMARY]", "");
+  return `${lines.join("\n")}\n`;
+}
+
+function updateScratchpadFromUserInput(
+  scratchpad: SessionScratchpad,
+  currentTopic: string,
+  userText: string,
+  shouldStore: boolean,
+): void {
+  scratchpad.currentTopic = currentTopic;
+
+  const candidateName = extractCandidateName(userText);
+  if (candidateName) {
+    scratchpad.candidateName = candidateName;
+  }
+
+  if (shouldStore) {
+    scratchpad.lastMeaningfulExample = normalizeMemoryText(userText);
+  }
+}
+
+function updateScratchpadFromAssistantOutput(
+  scratchpad: SessionScratchpad,
+  currentTopic: string,
+  assistantText: string,
+): void {
+  scratchpad.currentTopic = currentTopic;
+  scratchpad.openFollowUp = extractOpenFollowUp(assistantText);
 }
 
 // Append one JSON line to the log file (sync is fine for small writes)
@@ -266,6 +430,7 @@ serve({
       
       // Initialize conversation memory for this session
       (ws as any).data.conversationMemory = getInitialMemory();
+      (ws as any).data.sessionScratchpad = getInitialScratchpad();
 
       ws.send(JSON.stringify({ type: "connected" }));
     },
@@ -324,8 +489,9 @@ serve({
 
         if (msg.type === "llm") {
          // 1. INJECT THE INVISIBLE SCORECARD INTO THE PROMPT
+          const currentCategory = interviewState.categories[interviewState.categoryIndex] ?? "Introduction";
           const nextCatIndex = interviewState.categoryIndex < interviewState.categories.length - 1 ? interviewState.categoryIndex + 1 : interviewState.categoryIndex;
-          const nextCategory = interviewState.categories[nextCatIndex];
+          const nextCategory = interviewState.categories[nextCatIndex] ?? currentCategory;
           
           const currentScore = Math.min(interviewState.scores[interviewState.categoryIndex] ?? 0, 100); 
           const pointsNeeded = 100 - currentScore;
@@ -350,28 +516,44 @@ serve({
 
           // Get conversation context to make responses more natural
           const conversationMemory = (ws as any).data?.conversationMemory as ConversationMemory | undefined;
+          const sessionScratchpad = (ws as any).data?.sessionScratchpad as SessionScratchpad | undefined;
           const conversationContext = conversationMemory ? getContextForPrompt(conversationMemory) : "";
           
           // --- FIX: Only store actual user speech, not meta commands ---
           const isMetaCommand = msg.prompt.includes("[KICKOFF]") || msg.prompt.includes("[SYSTEM");
           const cleanUserInput = isMetaCommand ? "" : msg.prompt;
+          const previousAssistantText = conversationMemory && conversationMemory.exchanges.length > 0
+            ? conversationMemory.exchanges[conversationMemory.exchanges.length - 1]?.npc
+            : undefined;
+          const shouldStoreTurn = !isMetaCommand && shouldStoreMeaningfulTurn(cleanUserInput, previousAssistantText);
+
+          if (sessionScratchpad && cleanUserInput) {
+            updateScratchpadFromUserInput(
+              sessionScratchpad,
+              currentCategory,
+              cleanUserInput,
+              shouldStoreTurn,
+            );
+          }
+
+          const scratchpadContext = sessionScratchpad ? getScratchpadContext(sessionScratchpad) : "";
 
           // Build the full prompt with clear separation
           const systemContext = `
 [SYSTEM CONTEXT - DO NOT READ ALOUD]
-Current Category: ${interviewState.categories[interviewState.categoryIndex]}
+Current Category: ${currentCategory}
 Next Category: ${nextCategory}
 
 [SYSTEM COMMAND FOR THIS TURN - CRITICAL]
 ${forcedAction}
 [/SYSTEM CONTEXT]
 
-${conversationContext}${isMetaCommand ? msg.prompt : `User Answer: "${msg.prompt}"`}
+${scratchpadContext}${conversationContext}${isMetaCommand ? msg.prompt : `User Answer: "${msg.prompt}"`}
 `;
           // 
           const fullPrompt = systemContext;
 
-          console.log(`[llm] model=${msg.model} category=${interviewState.categories[interviewState.categoryIndex]}`);
+          console.log(`[llm] model=${msg.model} category=${currentCategory}`);
           log({ role: "user", prompt: fullPrompt });
           
           const rawResponse = await queryOllama({
@@ -385,10 +567,24 @@ ${conversationContext}${isMetaCommand ? msg.prompt : `User Answer: "${msg.prompt
           // Parse the JSON block and tags using your existing helper function
           const parsed = parseLlmResponse(rawResponse);
 
-          // --- FIX: Store complete exchange in rolling window memory ---
-          if (conversationMemory && !isMetaCommand && parsed.ttsCleanText) {
-            addExchangeToMemory(conversationMemory, msg.prompt, parsed.ttsCleanText);
+          // Keep only substantive turns in raw history to reduce prompt noise.
+          if (conversationMemory && shouldStoreTurn && parsed.ttsCleanText) {
+            addExchangeToMemory(
+              conversationMemory,
+              normalizeMemoryText(cleanUserInput),
+              normalizeMemoryText(parsed.ttsCleanText),
+            );
             console.log(`[Memory] Stored exchange. History size: ${conversationMemory.exchanges.length}/${conversationMemory.maxExchanges}`);
+          } else if (!isMetaCommand && cleanUserInput) {
+            console.log("[Memory] Skipped noisy turn.");
+          }
+
+          if (sessionScratchpad && parsed.ttsCleanText) {
+            updateScratchpadFromAssistantOutput(
+              sessionScratchpad,
+              currentCategory,
+              parsed.ttsCleanText,
+            );
           }
 
           // 2. PROCESS THE GRADE AND GAME LOOP
@@ -424,6 +620,10 @@ ${conversationContext}${isMetaCommand ? msg.prompt : `User Answer: "${msg.prompt
                     console.log(`[INTERVIEW COMPLETE] Outro phase active.`);
                 }
             }
+          }
+
+          if (sessionScratchpad) {
+            sessionScratchpad.currentTopic = interviewState.categories[interviewState.categoryIndex] ?? currentCategory;
           }
           
 

@@ -80,6 +80,9 @@ Do not penalize the candidate for lacking work experience if they show curiosity
 
 === INSTRUCTIONS ===
 You will be given a [SYSTEM COMMAND FOR THIS TURN]. You MUST follow it exactly.
+You may also be given a [MEMORY - STABLE FACTS] block. Treat any candidate identity details there as authoritative session memory.
+If a candidate name is present in memory, keep using that name consistently when addressing the candidate.
+Do NOT ask for the candidate's name again unless the candidate explicitly corrects it.
 
 === GRADING METRICS ===
 If the command asks you to evaluate the answer, use these values for "addProgress":
