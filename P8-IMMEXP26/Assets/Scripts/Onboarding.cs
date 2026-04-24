@@ -2,57 +2,83 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.InputSystem;
 
 public class BlackScreenIntro : MonoBehaviour
 {
     [Header("References")]
-    public Image blackPanel;         // The black UI Image
-    public AudioSource audioSource;  // AudioSource with your voice clip
+    public Image image;
+    public AudioClip audioClip;
 
     [Header("Settings")]
-    public float delayAfterClip = 0.5f;   // pause after clip ends before fade
-    public float fadeDuration = 1.5f;      // how long the fade-out takes
-    public string nextScene = "";          // leave empty to just fade and stop
+    public float sceneTransitionDelay = 1.5f;
+    public float fadeInDuration = 1f;
+    public string nextScene = "";
+
+    private bool started = false;
 
     void Start()
     {
-        // Make sure panel is fully black/opaque
-        SetAlpha(1f);
-        StartCoroutine(PlayAndFade());
+        if (image != null)
+            image.gameObject.SetActive(false);
+    }
+
+    void Update()
+    {
+        if (Keyboard.current.spaceKey.wasPressedThisFrame && !started)
+        {
+            started = true;
+            StartCoroutine(PlayAndFade());
+        }
     }
 
     IEnumerator PlayAndFade()
     {
-        // Play the voice clip once
-        audioSource.Play();
-
-        // Wait for the clip to finish
-        yield return new WaitForSeconds(audioSource.clip.length);
-
-        // Small pause after clip
-        yield return new WaitForSeconds(delayAfterClip);
-
-        // Fade out the black panel
-        float elapsed = 0f;
-        while (elapsed < fadeDuration)
+        if (image != null)
         {
-            elapsed += Time.deltaTime;
-            float alpha = Mathf.Lerp(1f, 0f, elapsed / fadeDuration);
-            SetAlpha(alpha);
-            yield return null;
+            image.gameObject.SetActive(true);
+            
+            yield return StartCoroutine(FadeInImage());
         }
 
-        SetAlpha(0f);
+        if (audioClip != null)
+        {
+            AudioSource audioSource = GetComponent<AudioSource>();
+            if (audioSource == null)
+                audioSource = gameObject.AddComponent<AudioSource>();
+            
+            audioSource.clip = audioClip;
+            audioSource.Play();
 
-        // Optional: load next scene
+            yield return new WaitForSeconds(audioClip.length);
+        }
+
+        yield return new WaitForSeconds(sceneTransitionDelay);
+
         if (!string.IsNullOrEmpty(nextScene))
             SceneManager.LoadScene(nextScene);
     }
 
-    void SetAlpha(float alpha)
+    IEnumerator FadeInImage()
     {
-        Color c = blackPanel.color;
-        c.a = alpha;
-        blackPanel.color = c;
+        if (image == null)
+            yield break;
+
+        Color color = image.color;
+        color.a = 0f;
+        image.color = color;
+
+        float elapsedTime = 0f;
+        while (elapsedTime < fadeInDuration)
+        {
+            elapsedTime += Time.deltaTime;
+            color.a = Mathf.Clamp01(elapsedTime / fadeInDuration);
+            image.color = color;
+            yield return null;
+        }
+
+        color.a = 1f;
+        image.color = color;
     }
+
 }
