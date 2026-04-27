@@ -29,6 +29,8 @@ public class NpcAgent : MonoBehaviour
     private static readonly Regex FinalTtsForbiddenChars = new Regex(@"[\[\]\{\}/]", RegexOptions.Compiled);
     private static readonly Regex MultiWhitespace = new Regex(@"\s{2,}", RegexOptions.Compiled);
 
+    public bool isNVB = true;
+
     // --- NEW: ANIMATION VARIATION DICTIONARY ---
     // Define how many variations each trigger has. 
     // Example: "gesture_mephoric", 3 means it rolls between 0, 1, and 2.
@@ -51,6 +53,16 @@ public class NpcAgent : MonoBehaviour
         if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
         if (animator == null) animator = GetComponentInChildren<Animator>();
         if (eyeContactIK == null) eyeContactIK = GetComponent<EyeContactIK>();
+
+        // --- NEW: Disable ConversationalGazeBrain on the parent if isNVB is false ---
+        if (!isNVB)
+        {
+            ConversationalGazeBrain gazeBrain = GetComponentInParent<ConversationalGazeBrain>();
+            if (gazeBrain != null)
+            {
+                gazeBrain.enabled = false;
+            }
+        }
 
         // Here we subscribe to the real-time backchannel events from the server!
         if (llm != null) llm.OnBackchannel += HandleRealTimeBackchannel;
@@ -166,8 +178,9 @@ public class NpcAgent : MonoBehaviour
 
     private void HandleActionTag(string tag)
     {
+        if (isNVB == true) {
         switch (tag)
-        {
+            {
             case "nod_backchannel":
                 if (eyeContactIK != null) eyeContactIK.TriggerProceduralNod(1.2f);
                 break;
@@ -183,12 +196,14 @@ public class NpcAgent : MonoBehaviour
             default:
                 FireAnimatorTrigger(tag);
                 break;
+            }
         }
     }
 
     // ---REAL-TIME LISTENER LOGIC---
     private void HandleRealTimeBackchannel(string targetNpc, string action)
     {
+        if (!isNVB) return;
         // Checks for name (HR, TECH e.g)
         if (Profile == null || !Profile.npcName.Contains(targetNpc)) return;
 

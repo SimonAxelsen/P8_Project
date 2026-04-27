@@ -1285,7 +1285,7 @@ MonoBehaviour:
   - Mouth_Smile_L
   - Mouth_Smile_R
   smileIntensity: 60
-  isNVB: 1
+  isNVB: 0
 --- !u!1 &642802541
 GameObject:
   m_ObjectHideFlags: 0
@@ -28658,6 +28658,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: b05b48fd775163a49b334890d12cd4b0, type: 2}
+    - target: {fileID: 5099267261704613376, guid: 9e3aeb3b92d317243a4736bc3c6b6726, type: 3}
+      propertyPath: isNVB
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5099267261704613376, guid: 9e3aeb3b92d317243a4736bc3c6b6726, type: 3}
       propertyPath: animator
       value: 

@@ -74,7 +74,8 @@ public class VoiceTest : MonoBehaviour
     string currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
 
     // 1. PRIMARY FEATURE: We are in the interview, handle voice recording!
-    if (currentScene == "CoreScene")
+    // Make sure to type the exact names of your scenes here, matching the capitalization perfectly!
+    if (currentScene == "CoreScene" || currentScene == "CoreScene1")
     {
         if (Microphone.IsRecording(_micDevice)) 
         {

@@ -38,11 +38,10 @@ public class Scenetransition : MonoBehaviour
 {
     // 1. Ask Unity for the name of the scene we are currently in
     string scenename = SceneManager.GetActiveScene().name;
-
-    // 2. Check if it is NOT "Corescene"
-    if (scenename != "Corescene")
+    Debug.Log("Current scene: " + scenename);
+    if (scenename != "Corescene" && scenename != "CoreScene1")
     {
-        StartCoroutine(FadeAndLoad());
+    StartCoroutine(FadeAndLoad());
     }
 }
 
