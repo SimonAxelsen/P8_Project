@@ -501,7 +501,7 @@ serve({
           let forcedAction = "";
           
           // NEW: 40% chance for the Tech lead to jump in with an add-on question
-          const techJumpInChance = Math.random() < 0.50;
+          const techJumpInChance = Math.random() < 0.40;
 
           if (msg.prompt.includes("[KICKOFF]")) {
               forcedAction = "SPEAKER MUST BE HR. Output 'addProgress': 0. Welcome the candidate warmly and ask an engaging icebreaker question.";
