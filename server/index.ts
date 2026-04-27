@@ -499,6 +499,10 @@ serve({
           // --- ADAPTIVE ORCHESTRATOR ---
           // The server guides the AI but allows natural flow
           let forcedAction = "";
+          
+          // NEW: 40% chance for the Tech lead to jump in with an add-on question
+          const techJumpInChance = Math.random() < 0.50;
+
           if (msg.prompt.includes("[KICKOFF]")) {
               forcedAction = "SPEAKER MUST BE HR. Output 'addProgress': 0. Welcome the candidate warmly and ask an engaging icebreaker question.";
           } else if (interviewState.categoryIndex === interviewState.categories.length - 1) {
@@ -509,9 +513,12 @@ serve({
           } else if (interviewState.questionCount >= 3) {
               // Hard limit: force transition
               forcedAction = `MAXIMUM QUESTIONS REACHED. SPEAKER MUST BE HR. Output 'addProgress': ${pointsNeeded}. Say something natural like "Excellent, I think we have a good sense of this area. Let's discuss..." and transition to: ${nextCategory}.`;
+          } else if (techJumpInChance) {
+              // NEW: Artificially force Tech to ask a follow-up/add-on
+              forcedAction = `Evaluate the candidate's answer thoughtfully. SPEAKER MUST BE TECH. You are jumping in to ask a specific, practical follow-up question based on what the candidate just said. Focus on basic troubleshooting or reasoning. Grade their answer normally using 'addProgress'.`;
           } else {
-              // Standard grading: adaptive speaker assignment
-              forcedAction = `Evaluate the candidate's answer thoughtfully. IF Grade >= ${pointsNeeded}, SPEAKER MUST BE HR and naturally transition to ${nextCategory} with a brief acknowledgment. IF Grade < ${pointsNeeded}, SPEAKER can be TECH or HR (whoever fits naturally) and ask a relevant follow-up question to probe deeper.`;
+              // Standard grading: HR takes the lead
+              forcedAction = `Evaluate the candidate's answer thoughtfully. IF Grade >= ${pointsNeeded}, SPEAKER MUST BE HR and naturally transition to ${nextCategory} with a brief acknowledgment. IF Grade < ${pointsNeeded}, SPEAKER MUST BE HR and ask a relevant follow-up question to probe deeper.`;
           }
 
           // Get conversation context to make responses more natural
