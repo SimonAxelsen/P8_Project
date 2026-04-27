@@ -348,13 +348,13 @@ class AudioMsg
     public string data;    // base64
 }
 
-// Matches JSON and Bun
 [System.Serializable]
 public class InterviewGameData
 {
     public string[] allCategories;
     public int[] allScores;
     public bool isOutro;
+    public bool isSimulationComplete; // <-- NEW: Catch the flag from the server
 }
 
 [System.Serializable]

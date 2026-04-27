@@ -501,7 +501,7 @@ serve({
           let forcedAction = "";
           
           // NEW: 40% chance for the Tech lead to jump in with an add-on question
-          const techJumpInChance = Math.random() < 0.40;
+          const techJumpInChance = Math.random() < 0.50;
 
           if (msg.prompt.includes("[KICKOFF]")) {
               forcedAction = "SPEAKER MUST BE HR. Output 'addProgress': 0. Welcome the candidate warmly and ask an engaging icebreaker question.";
@@ -613,19 +613,22 @@ ${scratchpadContext}${conversationContext}${isMetaCommand ? msg.prompt : `User A
             // Check if THIS category has reached completion threshold
             const categoryComplete = (interviewState.scores[interviewState.categoryIndex] ?? 0) >= 100;
             const questionLimitReached = interviewState.questionCount >= 3;
-            
+          
+            let isSimulationComplete = false; // NEW: Track if the whole thing is done
+
             if (categoryComplete || questionLimitReached) {
-                // Only move to the next category if we AREN'T on the final Outro step
-                if (interviewState.categoryIndex < interviewState.categories.length - 1) {
-                    const previousCategory = interviewState.categories[interviewState.categoryIndex];
-                    interviewState.categoryIndex++;
-                    interviewState.questionCount = 0; // Reset questions for the new category
-                    
-                    const reason = categoryComplete ? "100% score reached" : "question limit reached";
-                    console.log(`[PHASE TRANSITION] ${previousCategory} → ${interviewState.categories[interviewState.categoryIndex]} (${reason})`);
-                } else {
-                    console.log(`[INTERVIEW COMPLETE] Outro phase active.`);
-                }
+              // Only move to the next category if we AREN'T on the final Outro step
+              if (interviewState.categoryIndex < interviewState.categories.length - 1) {
+                  const previousCategory = interviewState.categories[interviewState.categoryIndex];
+                  interviewState.categoryIndex++;
+                  interviewState.questionCount = 0; // Reset questions for the new category
+                  
+                  const reason = categoryComplete ? "100% score reached" : "question limit reached";
+                  console.log(`[PHASE TRANSITION] ${previousCategory} → ${interviewState.categories[interviewState.categoryIndex]} (${reason})`);
+              } else {
+                  console.log(`[INTERVIEW COMPLETE] Outro phase finished.`);
+                  isSimulationComplete = true; // NEW: The final phase is over!
+              }
             }
           }
 
@@ -634,7 +637,7 @@ ${scratchpadContext}${conversationContext}${isMetaCommand ? msg.prompt : `User A
           }
           
 
-          // 3. SEND TO UNITY 
+         // 3. SEND TO UNITY 
           ws.send(JSON.stringify({ 
             type: "llm_parsed", 
             npc: currentSpeaker, 
@@ -642,11 +645,12 @@ ${scratchpadContext}${conversationContext}${isMetaCommand ? msg.prompt : `User A
             tags: parsed.tags,
             textForSubtitles: parsed.textWithTags, 
             response: rawResponse,
-            // --- NEW: THE CLEAN DATA BRIDGE ---
+            // --- THE CLEAN DATA BRIDGE ---
             gameData: {
                 allCategories: interviewState.categories,
                 allScores: interviewState.scores,
-                isOutro: interviewState.categoryIndex === (interviewState.categories.length - 1)
+                isOutro: interviewState.categoryIndex === (interviewState.categories.length - 1),
+                isSimulationComplete: isSimulationComplete
             }
           }));
 
