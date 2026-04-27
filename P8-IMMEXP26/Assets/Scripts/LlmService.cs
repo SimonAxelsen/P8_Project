@@ -354,7 +354,7 @@ public class InterviewGameData
     public string[] allCategories;
     public int[] allScores;
     public bool isOutro;
-    public bool isSimulationComplete; // <-- NEW: Catch the flag from the server
+    public bool isSimulationComplete;
 }
 
 [System.Serializable]
