@@ -147,6 +147,15 @@ public class VoiceTest : MonoBehaviour
                 vad = pf.vad,
                 pauseMs = pf.pauseMs,
                 speechMs = pf.speechMs,
+                rmsDb = pf.rmsDb,
+                f0Slope = pf.f0Slope,
+                voicedRatio = pf.voicedRatio,
+                specFlux = pf.specFlux,
+                speechConfidence = pf.speechConfidence,
+                boundaryConfidence = pf.boundaryConfidence,
+                turnEndScore = pf.turnEndScore,
+                questionLike = pf.questionLike,
+                engagementScore = pf.engagementScore,
                 addressee = "UNKNOWN", // later: compute from gaze
                 agentsSpeaking = new AgentsSpeaking { HR = false, TECH = false }
             };

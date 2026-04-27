@@ -212,36 +212,49 @@ public class NpcAgent : MonoBehaviour
         if (action == "NodSmall" || action == "nod_backchannel")
         {
             if (eyeContactIK != null) eyeContactIK.TriggerProceduralNod(1.2f);
+            return;
         }
+
+        FireAnimatorTrigger(action);
     }
 
     // --- UPDATED ANIMATOR TRIGGER LOGIC ---
     private void FireAnimatorTrigger(string triggerName)
     {
-        if (animator != null)
+        if (animator == null) return;
+        if (!HasTriggerParameter(triggerName))
         {
-            try 
-            { 
-                // 1. Check if the tag has random variations defined in our Dictionary
-                if (animationVariations.TryGetValue(triggerName, out int variationCount))
-                {
-                    // 2. Roll a random number
-                    int randomIndex = Random.Range(0, variationCount);
-                    
-                    // 3. Set the universal VariationIndex parameter
-                    animator.SetInteger("VariationIndex", randomIndex);
-                    
-                    Debug.Log($"[Animator] Randomizing '{triggerName}' - Rolled Index: {randomIndex}");
-                }
+            Debug.LogWarning($"{name}: Animator missing trigger '{triggerName}'");
+            return;
+        }
 
-                // 4. Fire the trigger (whether it was randomized or not)
-                animator.SetTrigger(triggerName); 
-            }
-            catch 
-            { 
-                Debug.LogWarning($"{name}: Animator missing trigger '{triggerName}'"); 
+        // 1. Check if the tag has random variations defined in our Dictionary
+        if (animationVariations.TryGetValue(triggerName, out int variationCount))
+        {
+            // 2. Roll a random number
+            int randomIndex = Random.Range(0, variationCount);
+
+            // 3. Set the universal VariationIndex parameter
+            animator.SetInteger("VariationIndex", randomIndex);
+
+            Debug.Log($"[Animator] Randomizing '{triggerName}' - Rolled Index: {randomIndex}");
+        }
+
+        // 4. Fire the trigger (whether it was randomized or not)
+        animator.SetTrigger(triggerName);
+    }
+
+    private bool HasTriggerParameter(string triggerName)
+    {
+        if (animator == null) return false;
+        foreach (var parameter in animator.parameters)
+        {
+            if (parameter.type == AnimatorControllerParameterType.Trigger && parameter.name == triggerName)
+            {
+                return true;
             }
         }
+        return false;
     }
 
     private IEnumerator TemporarilyDisableIK(float duration)

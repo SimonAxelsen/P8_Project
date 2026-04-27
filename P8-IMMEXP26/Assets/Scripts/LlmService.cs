@@ -283,6 +283,15 @@ public class BcFeatures
     public int vad;           // 0/1
     public float pauseMs;
     public float speechMs;
+    public float rmsDb;
+    public float f0Slope;
+    public float voicedRatio;
+    public float specFlux;
+    public float speechConfidence;
+    public float boundaryConfidence;
+    public float turnEndScore;
+    public float questionLike;
+    public float engagementScore;
     public string addressee;  // "HR"/"TECH"/"UNKNOWN"
     public AgentsSpeaking agentsSpeaking = new AgentsSpeaking();
 }
