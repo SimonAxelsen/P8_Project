@@ -31,6 +31,8 @@ public class LlmService : MonoBehaviour
     private WebSocket ws;
     private readonly Dictionary<string, System.Action<string>> pending = new();
     public static event System.Action<InterviewGameData> OnGameDataUpdated;
+
+    public static event System.Action OnSimulationComplete;
     
     // Connection status
     public bool IsConnected => ws != null && ws.State == WebSocketState.Open;
@@ -151,6 +153,12 @@ public class LlmService : MonoBehaviour
             {
                 Debug.Log("<color=green>[SYSTEM] The server officially declared the Outro phase.</color>");
                 // Turn on your Exit Text here!
+            }
+
+            if (msg.gameData != null && msg.gameData.isSimulationComplete)
+            {
+                Debug.Log("<color=magenta>[SYSTEM] Simulation Complete! Firing UI Event.</color>");
+                OnSimulationComplete?.Invoke(); // This is what tells SimulationEnd.cs to play the animation!
             }
 
             // --- FUTURE PROOFING FOR YOUR HP BARS ---

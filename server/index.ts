@@ -597,6 +597,8 @@ ${scratchpadContext}${conversationContext}${isMetaCommand ? msg.prompt : `User A
           // 2. PROCESS THE GRADE AND GAME LOOP
           let currentSpeaker = "HR"; 
           
+          let isSimulationComplete = false; // <-- MOVE IT HERE! So the whole function can see it.
+
           if (parsed.state) {
             // Did the LLM pick a speaker?
             if (parsed.state.speaker) currentSpeaker = parsed.state.speaker;
@@ -614,7 +616,7 @@ ${scratchpadContext}${conversationContext}${isMetaCommand ? msg.prompt : `User A
             const categoryComplete = (interviewState.scores[interviewState.categoryIndex] ?? 0) >= 100;
             const questionLimitReached = interviewState.questionCount >= 3;
           
-            let isSimulationComplete = false; // NEW: Track if the whole thing is done
+            // (Remove the "let isSimulationComplete = false;" that was here)
 
             if (categoryComplete || questionLimitReached) {
               // Only move to the next category if we AREN'T on the final Outro step
