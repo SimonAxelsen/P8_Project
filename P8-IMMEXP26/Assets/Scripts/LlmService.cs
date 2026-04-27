@@ -151,14 +151,8 @@ public class LlmService : MonoBehaviour
             // --- THE CLEAN EVENT TRIGGER ---
             if (msg.gameData != null && msg.gameData.isOutro)
             {
-                Debug.Log("<color=green>[SYSTEM] The server officially declared the Outro phase.</color>");
-                // Turn on your Exit Text here!
-            }
-
-            if (msg.gameData != null && msg.gameData.isSimulationComplete)
-            {
-                Debug.Log("<color=magenta>[SYSTEM] Simulation Complete! Firing UI Event.</color>");
-                OnSimulationComplete?.Invoke(); // This is what tells SimulationEnd.cs to play the animation!
+                Debug.Log("<color=green>[SYSTEM] Outro reached! Firing End Animation.</color>");
+                OnSimulationComplete?.Invoke(); // <-- MOVE IT HERE!
             }
 
             // --- FUTURE PROOFING FOR YOUR HP BARS ---
