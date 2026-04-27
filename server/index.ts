@@ -263,9 +263,20 @@ type BcFeaturesMsg = {
   vad: 0 | 1;
   pauseMs: number;
   speechMs: number;
+  rmsDb: number;
+  f0Slope: number;
+  voicedRatio: number;
+  specFlux: number;
+  speechConfidence: number;
+  boundaryConfidence: number;
+  turnEndScore: number;
+  questionLike: number;
+  engagementScore: number;
   addressee?: "HR" | "TECH" | "UNKNOWN";
   agentsSpeaking?: { HR?: boolean; TECH?: boolean };
 };
+
+type BcAction = "NodSmall" | "nrub" | "shrugandshake" | "seatAdjustment" | "shoulderwarmup";
 
 type BcTriggerMsg = {
   type: "bc_trigger";
@@ -276,6 +287,7 @@ type BcTriggerMsg = {
 type BcState = {
   lastGlobalTs: number;
   lastPerNpcTs: Record<NpcKey, number>;
+  lastPerActionTs: Record<BcAction, number>;
 };
 
 // --- Changable things for the mic(amount of times a BC can be triggered etc. ALL IN MS) ---
@@ -284,9 +296,98 @@ const BC_MICROPAUSE_MAX = 700;
 const BC_EOT_THRESHOLD = 1000;      // treat > this as end-of-turn 
 const BC_GLOBAL_COOLDOWN = 2500;    
 const BC_NPC_COOLDOWN = 5000;       
+const BC_ACTION_COOLDOWN: Record<BcAction, number> = {
+  NodSmall: 4000,
+  nrub: 7000,
+  shrugandshake: 7000,
+  seatAdjustment: 8000,
+  shoulderwarmup: 8000,
+};
 
 function nowMs() {
   return Date.now();
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function normRange(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value) || max <= min) return 0;
+  return clamp01((value - min) / (max - min));
+}
+
+function absNorm(value: number, maxAbs: number): number {
+  if (!Number.isFinite(value) || maxAbs <= 0) return 0;
+  return clamp01(Math.abs(value) / maxAbs);
+}
+
+function chooseBackchannelAction(msg: BcFeaturesMsg): BcAction | null {
+  const normPause = normRange(msg.pauseMs, 120, 700);
+  const normSpeech = normRange(msg.speechMs, 400, 4000);
+  const normRms = normRange(msg.rmsDb, -45, -12);
+  const normF0Slope = absNorm(msg.f0Slope, 80);
+  const normFlux = normRange(msg.specFlux, 1, 6);
+  const speechConfidence = clamp01(msg.speechConfidence);
+  const boundaryConfidence = clamp01(msg.boundaryConfidence);
+  const turnEndScore = clamp01(msg.turnEndScore);
+  const questionLike = clamp01(msg.questionLike);
+  const engagementScore = clamp01(msg.engagementScore);
+  const voicedRatio = clamp01(msg.voicedRatio);
+
+  const turnYield = clamp01(
+    0.45 * turnEndScore +
+    0.35 * boundaryConfidence +
+    0.20 * normPause,
+  );
+
+  const uncertainty = clamp01(
+    0.35 * questionLike +
+    0.30 * (1 - speechConfidence) +
+    0.20 * normF0Slope +
+    0.15 * (1 - voicedRatio),
+  );
+
+  const arousal = clamp01(
+    0.35 * normRms +
+    0.25 * normFlux +
+    0.25 * engagementScore +
+    0.15 * voicedRatio,
+  );
+
+  const fatigueOrDisengagement = clamp01(
+    0.45 * (1 - engagementScore) +
+    0.30 * (1 - normRms) +
+    0.25 * normPause,
+  );
+
+  const strain = clamp01(
+    0.45 * normSpeech +
+    0.35 * arousal +
+    0.20 * (1 - speechConfidence),
+  );
+
+  if (turnYield > 0.62 && speechConfidence > 0.45 && uncertainty < 0.65) {
+    return "NodSmall";
+  }
+
+  if (questionLike > 0.65 && uncertainty > 0.55 && turnYield < 0.55) {
+    return "shrugandshake";
+  }
+
+  if (uncertainty > 0.68 && speechConfidence < 0.55) {
+    return "nrub";
+  }
+
+  if (fatigueOrDisengagement > 0.65 && engagementScore < 0.45) {
+    return "seatAdjustment";
+  }
+
+  if (strain > 0.66 && msg.speechMs > 1200 && engagementScore > 0.45) {
+    return "shoulderwarmup";
+  }
+
+  return null;
 }
 
 function chooseNpc(
@@ -324,11 +425,14 @@ function shouldTriggerBc(st: BcState, msg: BcFeaturesMsg): BcTriggerMsg | null {
 
   if (t - st.lastPerNpcTs[npc] < BC_NPC_COOLDOWN) return null;
 
-  // Testing for 1 action atm
-  const action = "NodSmall";
+  const action = chooseBackchannelAction(msg);
+  if (!action) return null;
+
+  if (t - st.lastPerActionTs[action] < BC_ACTION_COOLDOWN[action]) return null;
 
   st.lastGlobalTs = t;
   st.lastPerNpcTs[npc] = t;
+  st.lastPerActionTs[action] = t;
 
   return { type: "bc_trigger", npc, action };
 }
@@ -426,6 +530,13 @@ serve({
       (ws as any).data.bc = {
         lastGlobalTs: 0,
         lastPerNpcTs: { HR: 0, TECH: 0 },
+        lastPerActionTs: {
+          NodSmall: 0,
+          nrub: 0,
+          shrugandshake: 0,
+          seatAdjustment: 0,
+          shoulderwarmup: 0,
+        },
       } satisfies BcState;
       
       // Initialize conversation memory for this session

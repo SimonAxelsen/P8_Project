@@ -27,11 +27,18 @@ public class ProsodyClient : MonoBehaviour
         public string type;
         public int vad;
         public float rms;
+        public float rmsDb;
         public float pauseMs;
         public float speechMs;
         public float f0Mean;      // may be 0 if null in JSON
         public float f0Slope;     // may be 0 if null in JSON
         public float voicedRatio; // may be 0 if null in JSON
+        public float specFlux;
+        public float speechConfidence;
+        public float boundaryConfidence;
+        public float turnEndScore;
+        public float questionLike;
+        public float engagementScore;
     }
 
     async void Start()
