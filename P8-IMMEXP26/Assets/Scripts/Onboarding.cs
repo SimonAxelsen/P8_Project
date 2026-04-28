@@ -13,7 +13,6 @@ public class BlackScreenIntro : MonoBehaviour
     [Header("Settings")]
     public float sceneTransitionDelay = 1.5f;
     public float fadeInDuration = 1f;
-    public string nextScene = "";
 
     private bool started = false;
 
@@ -37,7 +36,6 @@ public class BlackScreenIntro : MonoBehaviour
         if (image != null)
         {
             image.gameObject.SetActive(true);
-            
             yield return StartCoroutine(FadeInImage());
         }
 
@@ -55,8 +53,19 @@ public class BlackScreenIntro : MonoBehaviour
 
         yield return new WaitForSeconds(sceneTransitionDelay);
 
-        if (!string.IsNullOrEmpty(nextScene))
-            SceneManager.LoadScene(nextScene);
+        // --- NEW LOGIC STARTS HERE ---
+        // Get the index of the current scene and add 1 to get the next one
+        int nextSceneIndex = SceneManager.GetActiveScene().buildIndex + 1;
+
+        // Check if the next index actually exists in the build settings
+        if (nextSceneIndex < SceneManager.sceneCountInBuildSettings)
+        {
+            SceneManager.LoadScene(nextSceneIndex);
+        }
+        else
+        {
+            Debug.LogWarning("No next scene found in Build Settings! Loop to start or add more scenes.");
+        }
     }
 
     IEnumerator FadeInImage()
@@ -80,5 +89,4 @@ public class BlackScreenIntro : MonoBehaviour
         color.a = 1f;
         image.color = color;
     }
-
 }

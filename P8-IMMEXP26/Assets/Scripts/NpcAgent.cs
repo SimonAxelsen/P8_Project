@@ -179,23 +179,30 @@ public class NpcAgent : MonoBehaviour
     private void HandleActionTag(string tag)
     {
         if (isNVB == true) {
-        switch (tag)
+            switch (tag)
             {
-            case "nod_backchannel":
-                if (eyeContactIK != null) eyeContactIK.TriggerProceduralNod(1.2f);
-                break;
+                case "nod_backchannel":
+                    if (eyeContactIK != null) eyeContactIK.TriggerProceduralNod(1.2f);
+                    break;
 
-            case "gaze_aversion":
-                if (eyeContactIK != null) eyeContactIK.TriggerProceduralGazeAversion(2.5f);
-                break;
+                case "gaze_aversion":
+                    if (eyeContactIK != null) eyeContactIK.TriggerProceduralGazeAversion(2.5f);
+                    break;
 
-            case "smile_polite":
-                if (faceMesh != null) StartCoroutine(SmileRoutine(2.0f));
-                break;
+                case "smile_polite":
+                    if (faceMesh != null) StartCoroutine(SmileRoutine(2.0f));
+                    break;
+                
+                // --- NEW: explicitly catch the procedural neutral tag ---
+                case "neutral":
+                    // If you have a specific "return to idle" trigger, fire it here.
+                    // Otherwise, the default block will try to find a parameter named "neutral".
+                    FireAnimatorTrigger("neutral"); 
+                    break;
 
-            default:
-                FireAnimatorTrigger(tag);
-                break;
+                default:
+                    FireAnimatorTrigger(tag);
+                    break;
             }
         }
     }
