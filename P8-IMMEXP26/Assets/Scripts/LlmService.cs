@@ -168,7 +168,7 @@ public class LlmService : MonoBehaviour
             {
                 if (agent.Profile != null && agent.Profile.npcName == msg.npc)
                 {
-                    agent.OnLlmResponse(msg.response);
+                    agent.OnLlmResponse(msg.textForSubtitles);
                 }
             }
             return;
@@ -374,5 +374,6 @@ public class ParsedLlmMessage
     public string type;
     public string npc;
     public string response;
+    public string textForSubtitles;
     public InterviewGameData gameData;
 }

@@ -502,24 +502,27 @@ function parseLlmResponse(rawText: string) {
   ttsCleanText = ttsCleanText.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu, "").trim();
 
   // --- 5. PROCEDURAL ANIMATION INJECTION (THE "AMP UP") ---
-  // We keep the LLM's organic tags, but forcefully inject extra beats every 2 words.
   let wordCounter = 0;
   const fillerTags = ["gesture_beat", "gesture_explain", "gesture_metaphoric"]; 
   
- // Regex looks for words (ignoring the bracketed tags the LLM already placed)
+  // Regex looks for words (ignoring the bracketed tags the LLM already placed)
   let ampedTextWithTags = textWithoutState.replace(/(\b[a-zA-Z0-9_'-]+\b[.,!?]*)/g, (wordMatch) => {
       wordCounter++;
       if (wordCounter % 2 === 0) {
-          // Pick a random tag from our filler list
           const randomTag = fillerTags[Math.floor(Math.random() * fillerTags.length)]!;
-          tags.push(randomTag); // Push to the tags array so Unity knows about it
+          tags.push(randomTag); 
           return `${wordMatch} [${randomTag}]`;
       }
       return wordMatch;
   });
 
-  // Force the neutral ending
+  // --- NEW FIX: Prevent the finish-line traffic jam ---
+  // This regex deletes any existing tags at the very tail end of the string
+  ampedTextWithTags = ampedTextWithTags.replace(/(?:\[[a-zA-Z0-9_]+\]\s*)+$/, "");
+
+  // Force the neutral ending cleanly
   ampedTextWithTags = `${ampedTextWithTags.trim()} [neutral]`;
+  
   if (!tags.includes("neutral")) {
       tags.push("neutral");
   }
