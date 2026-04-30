@@ -503,7 +503,7 @@ function parseLlmResponse(rawText: string) {
 
   // --- 5. PROCEDURAL ANIMATION INJECTION (THE "AMP UP") ---
   let wordCounter = 0;
-  const fillerTags = ["gesture_beat", "gesture_explain", "gesture_metaphoric"]; 
+  const fillerTags = ["gesture_beat", "gesture_explain"]; 
   
   // Regex looks for words (ignoring the bracketed tags the LLM already placed)
   let ampedTextWithTags = textWithoutState.replace(/(\b[a-zA-Z0-9_'-]+\b[.,!?]*)/g, (wordMatch) => {
