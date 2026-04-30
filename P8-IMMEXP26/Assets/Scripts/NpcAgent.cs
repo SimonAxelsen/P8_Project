@@ -244,7 +244,7 @@ public class NpcAgent : MonoBehaviour
             // 3. Set the universal VariationIndex parameter
             animator.SetInteger("VariationIndex", randomIndex);
 
-            Debug.Log($"[Animator] Randomizing '{triggerName}' - Rolled Index: {randomIndex}");
+            //Debug.Log($"[Animator] Randomizing '{triggerName}' - Rolled Index: {randomIndex}");
         }
 
         // 4. Fire the trigger (whether it was randomized or not)
